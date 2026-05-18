@@ -299,7 +299,7 @@
           <button class="hbtn" id="btn-stats" onclick="openStats()">📊 Stats</button>
           <button class="hbtn" id="btn-suggest" onclick="openSuggest()">💡 Suggest</button>
           <div class="streak-badge">🔥 <span id="streak-count">0 day streak</span></div>
-          <button class="hbtn" id="btn-admin" onclick="showAdmin()" style="display:none">⚙ Manage</button>
+          <button class="hbtn" id="btn-admin" onclick="showAdmin()">⚙ Manage</button>
         </div>
       </header>
       <div class="timer-bar">Next character in: <span id="countdown">–</span></div>
@@ -679,11 +679,27 @@ function startCountdown() {
 }
 
 /* ─── VIEW SWITCHING ─── */
-function showAdmin() {
-  if (!isManager) { toast("🔒 You don't have access to Manage"); return; }
+function openAdminPanel() {
   document.getElementById("view-game").classList.remove("active");
   document.getElementById("view-admin").classList.add("active");
   renderAdmin();
+}
+function showAdmin() {
+  // Already unlocked before? Go straight in.
+  if (localStorage.getItem("cg_manage_unlocked")==="yes") {
+    openAdminPanel();
+    return;
+  }
+  // Otherwise ask for the password.
+  const entered=prompt("Enter the Manage password:");
+  if (entered===null) return;            // cancelled
+  if (entered===MANAGE_PASSWORD) {
+    localStorage.setItem("cg_manage_unlocked","yes");  // remember forever
+    toast("✓ Manage unlocked");
+    openAdminPanel();
+  } else {
+    toast("🔒 Incorrect password");
+  }
 }
 function showGame() {
   document.getElementById("view-admin").classList.remove("active");
@@ -1005,18 +1021,20 @@ function renderStatsModal() {
     wrap.innerHTML=`<div class="stats-empty">No one has played yet today.</div>`;
   } else {
     wrap.innerHTML=players.map(p=>{
+      const name=p.name||"Player";
+      const grid=Array.isArray(p.grid)?p.grid:[];
       const cells=[];
       for (let r=0;r<MAX_ATT;r++){
         for (let c=0;c<5;c++){
-          const status=(p.grid[r]&&p.grid[r][c])||"empty";
+          const status=(grid[r]&&grid[r][c])||"empty";
           cells.push(`<div class="spc-cell ${status}"></div>`);
         }
       }
       return `<div class="stats-player-card">
         <div class="spc-avatar">${p.avatar
           ? `<img src="${p.avatar}" style="width:100%;height:100%;border-radius:50%;object-fit:cover"/>`
-          : (p.name[0]||"?")}</div>
-        <div class="spc-name">${p.name}</div>
+          : (name.charAt(0).toUpperCase()||"?")}</div>
+        <div class="spc-name">${name}</div>
         <div class="spc-grid" style="grid-template-columns:repeat(5,1fr)">${cells.join("")}</div>
       </div>`;
     }).join("");
@@ -1027,21 +1045,21 @@ function renderStatsModal() {
   const cur=(load(SK.streak)||{streak:0}).streak||0;
   document.getElementById("sg-winrate").textContent=rate+"%";
   document.getElementById("sg-current").textContent=cur;
-  document.getElementById("sg-best").textContent=Math.max(st.best,cur);
+  document.getElementById("sg-best").textContent=Math.max(st.best||0,cur);
 }
 /* Build today's player list from presence data + own progress */
 function getTodayPlayers() {
   const list=[];
-  // self
+  // self — always shown
   list.push({
     name:(currentUserName||"You")+" (you)",
     avatar:currentUserAvatar,
     grid:getColorGrid(),
   });
-  // others from shared presence (if Discord activity sync available)
+  // others currently in the activity
   presencePlayers.forEach(p=>{
-    if (p.userId===currentUserId) return;
-    list.push({ name:p.name, avatar:p.avatar, grid:p.grid||[] });
+    if (p.userId && p.userId===currentUserId) return;  // skip self
+    list.push({ name:p.name||"Player", avatar:p.avatar, grid:p.grid||[] });
   });
   return list;
 }
@@ -1065,20 +1083,19 @@ function toast(msg) {
 }
 
 /* ═══════════════════════════════════════════════════════
-   DISCORD SDK — presence, identity, manage-access
+   DISCORD SDK — presence & identity
    ─────────────────────────────────────────────────────
-   • DISCORD_CLIENT_ID     → your Discord app Client ID
-   • MANAGE_ACCESS_USER_ID → the ONLY user allowed in Manage
+   • DISCORD_CLIENT_ID → your Discord app Client ID
+   • MANAGE_PASSWORD   → password to unlock the Manage panel
    ═══════════════════════════════════════════════════ */
-const DISCORD_CLIENT_ID     = "1505740299220029662";
-const MANAGE_ACCESS_USER_ID = "507702002411634689";
+const DISCORD_CLIENT_ID = "YOUR_DISCORD_CLIENT_ID";
+const MANAGE_PASSWORD   = "cookie123";   // ← change this to your secret password
 
-let discordSdk      = null;
-let currentUserId   = null;
-let currentUserName = null;
+let discordSdk        = null;
+let currentUserId     = null;
+let currentUserName   = null;
 let currentUserAvatar = null;
-let isManager       = false;
-let presencePlayers = [];   // [{userId,name,avatar,grid}]
+let presencePlayers   = [];   // [{userId,name,avatar,grid}]
 
 (async()=>{
   try {
@@ -1086,92 +1103,59 @@ let presencePlayers = [];   // [{userId,name,avatar,grid}]
     discordSdk=new DiscordSDK(DISCORD_CLIENT_ID);
     await discordSdk.ready();
 
-    // Authorize — this gets the user to consent + gives us basic info
-    const {code}=await discordSdk.commands.authorize({
-      client_id:DISCORD_CLIENT_ID, response_type:"code",
-      state:"", prompt:"none", scope:["identify","guilds.members.read"],
-    });
-
-    // Try authenticate (needs backend token exchange to fully work).
-    // If it fails, we fall back to the participant list below.
+    /* AUTHORIZE — only request "identify".
+       Discord remembers consent per user, so after the FIRST
+       approval this resolves silently and shows no popup.
+       Asking for fewer scopes = fewer re-prompts. */
+    let code=null;
     try {
-      const auth=await discordSdk.commands.authenticate?.({access_token:code});
-      if (auth?.user) {
-        currentUserId=auth.user.id;
-        currentUserName=auth.user.global_name||auth.user.username||"Player";
-        if (auth.user.avatar)
-          currentUserAvatar=`https://cdn.discordapp.com/avatars/${auth.user.id}/${auth.user.avatar}.png?size=64`;
-      }
-    } catch(authErr){ console.warn("authenticate() failed (no backend token exchange) — using participant fallback",authErr); }
-
-    // ── FALLBACK: get our identity from the participant list ──
-    // This works without any backend.
-    if (!currentUserId) {
-      try {
-        const res=await discordSdk.commands.getInstanceConnectedParticipants();
-        const parts=res?.participants||[];
-        // The local user is always in the participant list
-        if (parts.length>0) {
-          // If only one participant, it's us. If multiple, we pick
-          // the first one (SDK typically lists the local user first).
-          // For reliability we match all and let manager check pass.
-          for (const p of parts) {
-            if (p.id===MANAGE_ACCESS_USER_ID) {
-              // This is us — we're the manager
-              currentUserId=p.id;
-              currentUserName=p.global_name||p.nickname||p.username||"Player";
-              if (p.avatar)
-                currentUserAvatar=`https://cdn.discordapp.com/avatars/${p.id}/${p.avatar}.png?size=64`;
-              break;
-            }
-          }
-          // If we didn't match manager ID, just take the first participant as ourselves
-          if (!currentUserId && parts.length===1) {
-            const p=parts[0];
-            currentUserId=p.id;
-            currentUserName=p.global_name||p.nickname||p.username||"Player";
-            if (p.avatar)
-              currentUserAvatar=`https://cdn.discordapp.com/avatars/${p.id}/${p.avatar}.png?size=64`;
-          }
-          // If multiple participants and none matched manager, try all
-          if (!currentUserId) {
-            const p=parts[0];
-            currentUserId=p.id;
-            currentUserName=p.global_name||p.nickname||p.username||"Player";
-            if (p.avatar)
-              currentUserAvatar=`https://cdn.discordapp.com/avatars/${p.id}/${p.avatar}.png?size=64`;
-          }
-        }
-      } catch(partErr){ console.warn("getInstanceConnectedParticipants failed",partErr); }
+      const res=await discordSdk.commands.authorize({
+        client_id:DISCORD_CLIENT_ID,
+        response_type:"code",
+        state:"",
+        prompt:"none",          // suppress consent screen after first time
+        scope:["identify"],
+      });
+      code=res?.code||null;
+    } catch(authErr){
+      console.warn("authorize() declined or failed",authErr);
     }
 
-    // ── LAST RESORT: check if frame user data is available ──
-    if (!currentUserId && discordSdk.user) {
-      currentUserId=discordSdk.user.id;
-      currentUserName=discordSdk.user.global_name||discordSdk.user.username||"Player";
-    }
-    if (!currentUserId && discordSdk.guildMember?.user) {
-      const u=discordSdk.guildMember.user;
+    /* Identify the local user — try several SDK fields.
+       None of these need a backend. */
+    function adopt(u){
+      if(!u||!u.id) return false;
       currentUserId=u.id;
-      currentUserName=u.global_name||u.username||"Player";
+      currentUserName=u.global_name||u.username||u.nickname||"Player";
+      if(u.avatar)
+        currentUserAvatar=`https://cdn.discordapp.com/avatars/${u.id}/${u.avatar}.png?size=64`;
+      return true;
     }
+    // 1) participant list (works without backend)
+    try {
+      const r=await discordSdk.commands.getInstanceConnectedParticipants();
+      const parts=r?.participants||[];
+      if(parts.length) adopt(parts[0]);
+    } catch(_){}
+    // 2) SDK-attached user objects
+    if(!currentUserId) adopt(discordSdk.user);
+    if(!currentUserId) adopt(discordSdk.guildMember?.user);
 
-    isManager=currentUserId && currentUserId===MANAGE_ACCESS_USER_ID;
-    applyManagerVisibility();
-
-    console.log("Discord ready. User:",currentUserName,"ID:",currentUserId,"Manager:",isManager);
+    console.log("Discord ready. User:",currentUserName,currentUserId);
 
     // ── LIVE PRESENCE ──
     await refreshParticipants();
-    discordSdk.subscribe?.("ACTIVITY_INSTANCE_PARTICIPANTS_UPDATE",refreshParticipants);
+    try {
+      discordSdk.subscribe?.("ACTIVITY_INSTANCE_PARTICIPANTS_UPDATE",refreshParticipants);
+    } catch(_){}
     publishPresence();
 
-    console.log("Discord ready. User:",currentUserName,currentUserId,"Manager:",isManager);
   } catch(e) {
     console.warn("Running outside Discord — standalone mode",e);
-    applyManagerVisibility();
-    renderPresence();   // show empty / fallback presence
+    renderPresence();
   }
+  // Manage button is always visible (password-gated on click)
+  document.getElementById("btn-admin").style.display="";
 })();
 
 /* Pull the live list of people in this activity instance */
@@ -1185,13 +1169,13 @@ async function refreshParticipants() {
       avatar:p.avatar
         ? `https://cdn.discordapp.com/avatars/${p.id}/${p.avatar}.png?size=64`
         : null,
-      grid:[],   // populated by shared activity messages if you sync them
+      grid:[],
     }));
   } catch(e) {
+    console.warn("refreshParticipants failed",e);
     presencePlayers=[];
   }
   renderPresence();
-  publishPresence();
 }
 
 /* Render the left "Playing now" sidebar */
@@ -1201,12 +1185,18 @@ function renderPresence() {
 
   // Build the displayed roster: everyone in the instance.
   let roster=presencePlayers.slice();
-  // make sure the current user is included
+  // make sure the current user is always included
   if (currentUserId && !roster.some(p=>p.userId===currentUserId)) {
     roster.unshift({userId:currentUserId,name:currentUserName||"You",avatar:currentUserAvatar});
   }
+  // if SDK gave us nothing at all but we have a name, show ourselves
   if (!roster.length && currentUserName) {
     roster=[{userId:"local",name:currentUserName,avatar:currentUserAvatar}];
+  }
+  // last resort: if we're clearly inside Discord but identity failed,
+  // still show a "You" entry so the panel isn't empty
+  if (!roster.length && discordSdk) {
+    roster=[{userId:"local",name:"You",avatar:null}];
   }
 
   countEl.textContent=`(${roster.length})`;
@@ -1215,14 +1205,17 @@ function renderPresence() {
     listEl.innerHTML=`<div class="presence-empty">No one is playing right now.</div>`;
     return;
   }
-  listEl.innerHTML=roster.map(p=>`
-    <div class="presence-user">
+  listEl.innerHTML=roster.map(p=>{
+    const name=p.name||"Player";
+    const isYou=(p.userId&&p.userId===currentUserId)||p.userId==="local";
+    return `<div class="presence-user">
       <div class="presence-avatar">${p.avatar
         ? `<img src="${p.avatar}" style="width:100%;height:100%;border-radius:50%;object-fit:cover"/>`
-        : (p.name[0]||"?")}</div>
-      <div class="presence-name">${p.name}${p.userId===currentUserId?" (you)":""}</div>
+        : name.charAt(0).toUpperCase()}</div>
+      <div class="presence-name">${name}${isYou?" (you)":""}</div>
       <div class="presence-dot" title="Playing"></div>
-    </div>`).join("");
+    </div>`;
+  }).join("");
 }
 
 /* ═══════════════════════════════════════════════════════
@@ -1264,14 +1257,6 @@ function publishPresence() {
   } catch(e) {
     console.warn("setActivity failed",e);
   }
-}
-
-function applyManagerVisibility() {
-  const btn=document.getElementById("btn-admin");
-  if (!btn) return;
-  const ALLOW_STANDALONE_MANAGE=false;   // set true only for local testing
-  if (isManager || (currentUserId===null && ALLOW_STANDALONE_MANAGE)) btn.style.display="";
-  else btn.style.display="none";
 }
 
 /* ─── BOOT ─── */
