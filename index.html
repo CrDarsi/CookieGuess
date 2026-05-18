@@ -296,10 +296,10 @@
       <header>
         <div class="logo">Cookie Guess</div>
         <div class="header-right">
-          <button class="hbtn" id="btn-stats" onclick="openStats()">📊 Stats</button>
-          <button class="hbtn" id="btn-suggest" onclick="openSuggest()">💡 Suggest</button>
+          <button class="hbtn" id="btn-stats">📊 Stats</button>
+          <button class="hbtn" id="btn-suggest">💡 Suggest</button>
           <div class="streak-badge">🔥 <span id="streak-count">0 day streak</span></div>
-          <button class="hbtn" id="btn-admin" onclick="showAdmin()">⚙ Manage</button>
+          <button class="hbtn" id="btn-admin">⚙ Manage</button>
         </div>
       </header>
       <div class="timer-bar">Next character in: <span id="countdown">–</span></div>
@@ -407,7 +407,30 @@
   </div>
 </div>
 
+<!-- PASSWORD MODAL -->
+<div class="modal-overlay" id="pw-modal">
+  <div class="modal" style="max-width:380px">
+    <div class="modal-head">
+      <div class="modal-title">🔒 Manage Access</div>
+      <button class="modal-close" onclick="closeModal('pw-modal')">✕ Close</button>
+    </div>
+    <div class="sug-note">Enter the manager password to access the Manage panel.</div>
+    <div class="form-field" style="margin-bottom:12px">
+      <label>Password</label>
+      <input type="password" id="pw-input" placeholder="Password" />
+    </div>
+    <button class="btn-add-char" onclick="checkPassword()">Unlock</button>
+  </div>
+</div>
+
 <div id="toast"></div>
+
+<script>
+/* ═══ GLOBAL ERROR GUARD ═══
+   Prevents any single error from silently killing the whole script
+   (which would stop buttons from working). */
+window.addEventListener("error",e=>console.warn("[CookieGuess] error:",e.message));
+</script>
 
 <script>
 /* ─── STORAGE KEYS ─── */
@@ -434,7 +457,12 @@ const DEFAULTS = {
     "Fire","Earth","Dark","Poison","Steel"
   ],
 };
-const getOpts  = () => load(SK.opts)   || structuredClone(DEFAULTS);
+const getOpts  = () => load(SK.opts)   || cloneDefaults();
+function cloneDefaults() {
+  // structuredClone isn't available in all Discord webviews
+  try { return structuredClone(DEFAULTS); }
+  catch { return JSON.parse(JSON.stringify(DEFAULTS)); }
+}
 const saveOpts = o  => save(SK.opts, o);
 const getChars = () => load(SK.chars)  || [];
 const saveChars= c  => save(SK.chars, c);
@@ -690,11 +718,18 @@ function showAdmin() {
     openAdminPanel();
     return;
   }
-  // Otherwise ask for the password.
-  const entered=prompt("Enter the Manage password:");
-  if (entered===null) return;            // cancelled
+  // Otherwise show the password modal (prompt() is blocked in Discord).
+  const inp=document.getElementById("pw-input");
+  if (inp) inp.value="";
+  document.getElementById("pw-modal").classList.add("show");
+  if (inp) setTimeout(()=>inp.focus(),50);
+}
+function checkPassword() {
+  const inp=document.getElementById("pw-input");
+  const entered=inp ? inp.value : "";
   if (entered===MANAGE_PASSWORD) {
-    localStorage.setItem("cg_manage_unlocked","yes");  // remember forever
+    localStorage.setItem("cg_manage_unlocked","yes");
+    closeModal("pw-modal");
     toast("✓ Manage unlocked");
     openAdminPanel();
   } else {
@@ -1088,8 +1123,8 @@ function toast(msg) {
    • DISCORD_CLIENT_ID → your Discord app Client ID
    • MANAGE_PASSWORD   → password to unlock the Manage panel
    ═══════════════════════════════════════════════════ */
-const DISCORD_CLIENT_ID = "1505740299220029662";
-const MANAGE_PASSWORD   = "JesusIsLord0590";   // ← change this to your secret password
+const DISCORD_CLIENT_ID = "YOUR_DISCORD_CLIENT_ID";
+const MANAGE_PASSWORD   = "cookie123";   // ← change this to your secret password
 
 let discordSdk        = null;
 let currentUserId     = null;
@@ -1259,7 +1294,19 @@ function publishPresence() {
   }
 }
 
+/* ─── EVENT BINDINGS ─── */
+function bindUI() {
+  const bind=(id,fn)=>{ const el=document.getElementById(id); if(el) el.addEventListener("click",fn); };
+  bind("btn-stats",   openStats);
+  bind("btn-suggest", openSuggest);
+  bind("btn-admin",   showAdmin);
+  // password input: Enter submits
+  const pw=document.getElementById("pw-input");
+  if (pw) pw.addEventListener("keydown",e=>{ if(e.key==="Enter") checkPassword(); });
+}
+
 /* ─── BOOT ─── */
+bindUI();
 initGame();
 renderPresence();
 </script>
