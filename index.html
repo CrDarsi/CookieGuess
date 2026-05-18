@@ -234,9 +234,6 @@
     .modal::-webkit-scrollbar-thumb{background:var(--muted)}
     .modal-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
     .modal-title{font-family:var(--font-head);font-size:1.4rem;letter-spacing:2px}
-    .modal-close{background:none;border:none;color:var(--sub);font-size:1.1rem;cursor:pointer;
-      padding:4px 8px;border-radius:var(--radius);transition:color .15s,background .15s}
-    .modal-close:hover{color:var(--text);background:var(--surface2)}
 
     /* stats modal */
     .stats-players{display:flex;gap:10px;flex-wrap:wrap;justify-content:center;margin-bottom:18px}
@@ -382,7 +379,6 @@
   <div class="modal">
     <div class="modal-head">
       <div class="modal-title">📊 Today's Players</div>
-      <button class="modal-close" onclick="closeModal('stats-modal')">✕ Close</button>
     </div>
     <div class="stats-players" id="stats-players"></div>
     <div class="stats-general">
@@ -401,7 +397,6 @@
   <div class="modal">
     <div class="modal-head">
       <div class="modal-title">💡 Suggest a Character</div>
-      <button class="modal-close" onclick="closeModal('suggest-modal')">✕ Close</button>
     </div>
     <div id="suggest-body"></div>
   </div>
@@ -412,14 +407,13 @@
   <div class="modal" style="max-width:380px">
     <div class="modal-head">
       <div class="modal-title">🔒 Manage Access</div>
-      <button class="modal-close" onclick="closeModal('pw-modal')">✕ Close</button>
     </div>
     <div class="sug-note">Enter the manager password to access the Manage panel.</div>
     <div class="form-field" style="margin-bottom:12px">
       <label>Password</label>
       <input type="password" id="pw-input" placeholder="Password" />
     </div>
-    <button class="btn-add-char" onclick="checkPassword()">Unlock</button>
+    <button class="btn-add-char" id="pw-unlock-btn">Unlock</button>
   </div>
 </div>
 
@@ -1123,8 +1117,8 @@ function toast(msg) {
    • DISCORD_CLIENT_ID → your Discord app Client ID
    • MANAGE_PASSWORD   → password to unlock the Manage panel
    ═══════════════════════════════════════════════════ */
-const DISCORD_CLIENT_ID = "1505740299220029662";
-const MANAGE_PASSWORD   = "JesusIsLord0590";   // ← change this to your secret password
+const DISCORD_CLIENT_ID = "YOUR_DISCORD_CLIENT_ID";
+const MANAGE_PASSWORD   = "cookie123";   // ← change this to your secret password
 
 let discordSdk        = null;
 let currentUserId     = null;
@@ -1297,9 +1291,10 @@ function publishPresence() {
 /* ─── EVENT BINDINGS ─── */
 function bindUI() {
   const bind=(id,fn)=>{ const el=document.getElementById(id); if(el) el.addEventListener("click",fn); };
-  bind("btn-stats",   openStats);
-  bind("btn-suggest", openSuggest);
-  bind("btn-admin",   showAdmin);
+  bind("btn-stats",     openStats);
+  bind("btn-suggest",   openSuggest);
+  bind("btn-admin",     showAdmin);
+  bind("pw-unlock-btn", checkPassword);
   // password input: Enter submits
   const pw=document.getElementById("pw-input");
   if (pw) pw.addEventListener("keydown",e=>{ if(e.key==="Enter") checkPassword(); });
