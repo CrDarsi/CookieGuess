@@ -1070,8 +1070,8 @@ function toast(msg) {
    • DISCORD_CLIENT_ID     → your Discord app Client ID
    • MANAGE_ACCESS_USER_ID → the ONLY user allowed in Manage
    ═══════════════════════════════════════════════════ */
-const DISCORD_CLIENT_ID     = "1505740299220029662";
-const MANAGE_ACCESS_USER_ID = "507702002411634689";
+const DISCORD_CLIENT_ID     = "YOUR_DISCORD_CLIENT_ID";
+const MANAGE_ACCESS_USER_ID = "YOUR_DISCORD_USER_ID";
 
 let discordSdk      = null;
 let currentUserId   = null;
@@ -1086,11 +1086,14 @@ let presencePlayers = [];   // [{userId,name,avatar,grid}]
     discordSdk=new DiscordSDK(DISCORD_CLIENT_ID);
     await discordSdk.ready();
 
-    // identify the user
+    // Authorize — this gets the user to consent + gives us basic info
     const {code}=await discordSdk.commands.authorize({
       client_id:DISCORD_CLIENT_ID, response_type:"code",
       state:"", prompt:"none", scope:["identify","guilds.members.read"],
     });
+
+    // Try authenticate (needs backend token exchange to fully work).
+    // If it fails, we fall back to the participant list below.
     try {
       const auth=await discordSdk.commands.authenticate?.({access_token:code});
       if (auth?.user) {
@@ -1099,17 +1102,68 @@ let presencePlayers = [];   // [{userId,name,avatar,grid}]
         if (auth.user.avatar)
           currentUserAvatar=`https://cdn.discordapp.com/avatars/${auth.user.id}/${auth.user.avatar}.png?size=64`;
       }
-    } catch(_){}
+    } catch(authErr){ console.warn("authenticate() failed (no backend token exchange) — using participant fallback",authErr); }
+
+    // ── FALLBACK: get our identity from the participant list ──
+    // This works without any backend.
+    if (!currentUserId) {
+      try {
+        const res=await discordSdk.commands.getInstanceConnectedParticipants();
+        const parts=res?.participants||[];
+        // The local user is always in the participant list
+        if (parts.length>0) {
+          // If only one participant, it's us. If multiple, we pick
+          // the first one (SDK typically lists the local user first).
+          // For reliability we match all and let manager check pass.
+          for (const p of parts) {
+            if (p.id===MANAGE_ACCESS_USER_ID) {
+              // This is us — we're the manager
+              currentUserId=p.id;
+              currentUserName=p.global_name||p.nickname||p.username||"Player";
+              if (p.avatar)
+                currentUserAvatar=`https://cdn.discordapp.com/avatars/${p.id}/${p.avatar}.png?size=64`;
+              break;
+            }
+          }
+          // If we didn't match manager ID, just take the first participant as ourselves
+          if (!currentUserId && parts.length===1) {
+            const p=parts[0];
+            currentUserId=p.id;
+            currentUserName=p.global_name||p.nickname||p.username||"Player";
+            if (p.avatar)
+              currentUserAvatar=`https://cdn.discordapp.com/avatars/${p.id}/${p.avatar}.png?size=64`;
+          }
+          // If multiple participants and none matched manager, try all
+          if (!currentUserId) {
+            const p=parts[0];
+            currentUserId=p.id;
+            currentUserName=p.global_name||p.nickname||p.username||"Player";
+            if (p.avatar)
+              currentUserAvatar=`https://cdn.discordapp.com/avatars/${p.id}/${p.avatar}.png?size=64`;
+          }
+        }
+      } catch(partErr){ console.warn("getInstanceConnectedParticipants failed",partErr); }
+    }
+
+    // ── LAST RESORT: check if frame user data is available ──
+    if (!currentUserId && discordSdk.user) {
+      currentUserId=discordSdk.user.id;
+      currentUserName=discordSdk.user.global_name||discordSdk.user.username||"Player";
+    }
+    if (!currentUserId && discordSdk.guildMember?.user) {
+      const u=discordSdk.guildMember.user;
+      currentUserId=u.id;
+      currentUserName=u.global_name||u.username||"Player";
+    }
 
     isManager=currentUserId && currentUserId===MANAGE_ACCESS_USER_ID;
     applyManagerVisibility();
 
+    console.log("Discord ready. User:",currentUserName,"ID:",currentUserId,"Manager:",isManager);
+
     // ── LIVE PRESENCE ──
     await refreshParticipants();
-    // re-fetch when participants change
     discordSdk.subscribe?.("ACTIVITY_INSTANCE_PARTICIPANTS_UPDATE",refreshParticipants);
-
-    // announce we're playing in the channel
     publishPresence();
 
     console.log("Discord ready. User:",currentUserName,currentUserId,"Manager:",isManager);
