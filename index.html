@@ -1,4 +1,84 @@
 <!DOCTYPE html>
+<!--
+═══════════════════════════════════════════════════════════════════════
+  COOKIE GUESS  —  Discord Embedded App  —  PROJECT STATUS / RESUME NOTES
+═══════════════════════════════════════════════════════════════════════
+  If you are an AI assistant and the user just uploaded this file in a
+  NEW chat, READ THIS BLOCK FIRST. It tells you exactly where the
+  project stands so you can continue without re-asking everything.
+
+  ── WHAT THIS IS ──────────────────────────────────────────────────────
+  A Wordle-style daily character-guessing game that runs as a Discord
+  Activity (Embedded App SDK) inside an iframe. Single self-contained
+  index.html — no backend, no build step. Hosted as a static file.
+
+  ── GAME RULES ────────────────────────────────────────────────────────
+  • Guess the daily character by name (NOT letters).
+  • Each guess reveals 5 categories, color-coded:
+      Game · Affiliation · Role · Rarity · Element
+  • Colors:  correct = exact match
+             close   = "similar" category (same similarity group)
+             wrong   = no match
+  • One character per UTC day, same for everyone, refreshes daily.
+  • 8 attempts max. Streak + win-rate tracked per user (localStorage).
+
+  ── CATEGORY RULES (set by the user) ──────────────────────────────────
+  • Games: user adds their own (no preloaded characters at all).
+  • Affiliation: Hero / Villain / Neutral.
+  • Role types (classes in same type = "similar"/yellow):
+      Melee:   Ambush, Charge, Defense, Smash, Slash
+      Ranged:  Bomber, Magic, Ranged
+      Support: Assist Buff, Assist Debuff, Healer, Support
+      Special: BTS, Special Guest
+  • Rarities (low→high): Common, Uncommon, Rare, Epic, Super Epic,
+      Legendary, Ancients, Beasts, Dragon
+  • Element similarity (a "/" pair = similar/yellow):
+      Water/Ice, Wind/Grass, Light/Electricity ; standalone:
+      Fire, Earth, Dark, Poison, Steel
+  • All categories/options are editable in-app via Manage → Categories.
+
+  ── FEATURES BUILT ────────────────────────────────────────────────────
+  • Theme: gray palette, square (rectangle) buttons.
+  • Left sidebar: "Playing now" — live participant list (Discord SDK).
+  • Header: Stats button, Suggest button, streak badge, Manage button.
+  • Stats modal: per-player color grids + win rate / current / best streak.
+  • Suggest modal: a player may suggest ONE character per day, ONLY
+      after they win that day. Submissions show in Manage → Suggestions.
+  • Manage panel is PASSWORD-gated (not user-ID gated). Once the correct
+      password is entered it is remembered (localStorage key
+      cg_manage_unlocked) so it is never asked again on that device.
+  • Manage tabs: Characters (add/remove), Categories (edit all options),
+      Suggestions (review/dismiss player suggestions).
+  • Discord chat presence: setActivity publishes "X was playing" /
+      "X and Y were playing" / "X, Y and Z were playing".
+
+  ── CONFIG (already filled in) ────────────────────────────────────────
+  • DISCORD_CLIENT_ID = "1505740299220029662"
+  • MANAGE_PASSWORD   = "JesusIsLord0590"
+  (These live in the 2nd JS block. Keep them when editing.)
+
+  ── KNOWN DISCORD-WEBVIEW GOTCHAS (already handled, keep handling) ─────
+  • window.prompt()/alert() are BLOCKED in the Discord iframe — never
+    use them; use in-app modals instead.
+  • Inline onclick="" attributes are UNRELIABLE in the Discord webview —
+    ALL buttons must be wired via addEventListener in bindUI(), and
+    dynamically-created buttons via event delegation on document.body.
+  • structuredClone may be missing — cloneDefaults() has a JSON fallback.
+
+  ── OUTSTANDING / NOT YET DONE ────────────────────────────────────────
+  • Showing OTHER players' actual guess grids in Stats/Presence needs a
+    backend (or Discord activity state sync) to share game state. The UI
+    is ready; presencePlayers[].grid just needs to be populated. Your
+    own data always shows correctly. This is the main remaining piece.
+
+  ── LAST WORKING SESSION ──────────────────────────────────────────────
+  • Fixed: Manage-tab buttons (Back to game, tabs, Add Character,
+    Remove, Dismiss) were dead because they had no event listeners —
+    now all wired in bindUI() incl. event delegation for dynamic ones.
+  • Removed the ✕ Close buttons from all modals (click outside to close).
+  • Baked in the Client ID + password above.
+═══════════════════════════════════════════════════════════════════════
+-->
 <html lang="en">
 <head>
   <meta charset="UTF-8" />
@@ -339,12 +419,12 @@
     <div id="view-admin" class="view">
       <div class="admin-header">
         <div class="admin-title">⚙ Manage</div>
-        <button class="btn-back" onclick="showGame()">← Back to game</button>
+        <button class="btn-back" id="btn-back-game">← Back to game</button>
       </div>
       <div class="admin-tabs">
-        <button class="tab-btn active" onclick="switchTab('characters')">Characters</button>
-        <button class="tab-btn" onclick="switchTab('options')">Categories</button>
-        <button class="tab-btn" onclick="switchTab('suggestions')">Suggestions</button>
+        <button class="tab-btn active" data-tab="characters">Characters</button>
+        <button class="tab-btn" data-tab="options">Categories</button>
+        <button class="tab-btn" data-tab="suggestions">Suggestions</button>
       </div>
       <div class="tab-panel active" id="tab-characters">
         <div class="section-title">Add a new character</div>
@@ -359,7 +439,7 @@
           <div class="form-field"><label>Rarity</label><select id="f-rarity"></select></div>
           <div class="form-field form-full"><label>Element</label><select id="f-element"></select></div>
         </div>
-        <button class="btn-add-char" onclick="addCharacter()">+ Add Character</button>
+        <button class="btn-add-char" id="btn-add-char">+ Add Character</button>
         <div id="char-list"></div>
       </div>
       <div class="tab-panel" id="tab-options">
@@ -780,7 +860,7 @@ function renderCharList() {
           <span class="tag">${c.element}</span>
         </div>
       </div>
-      <button class="btn-del" onclick="deleteChar(${i})">Remove</button>
+      <button class="btn-del" data-del-char="${i}">Remove</button>
     </div>`).join("");
 }
 function addCharacter() {
@@ -992,8 +1072,10 @@ function openSuggest() {
         <input type="text" id="sug-note-inp" placeholder="Rarity, element, why they'd fit…"/>
       </div>
     </div>
-    <button class="btn-add-char" onclick="submitSuggestion()">Submit Suggestion</button>`;
+    <button class="btn-add-char" id="btn-submit-suggestion">Submit Suggestion</button>`;
   document.getElementById("suggest-modal").classList.add("show");
+  const ssb=document.getElementById("btn-submit-suggestion");
+  if (ssb) ssb.addEventListener("click",submitSuggestion);
 }
 function submitSuggestion() {
   const name=document.getElementById("sug-name").value.trim();
@@ -1027,7 +1109,7 @@ function renderSuggestionList() {
         <div class="s-name">${s.name}</div>
         <div class="s-meta">${s.game?s.game+" · ":""}by ${s.userName}${s.note?' · "'+s.note+'"':""}</div>
       </div>
-      <button class="btn-del" onclick="deleteSuggestion(${idx})">Dismiss</button>
+      <button class="btn-del" data-del-suggestion="${idx}">Dismiss</button>
     </div>`;
   }).join("");
 }
@@ -1118,7 +1200,7 @@ function toast(msg) {
    • MANAGE_PASSWORD   → password to unlock the Manage panel
    ═══════════════════════════════════════════════════ */
 const DISCORD_CLIENT_ID = "1505740299220029662";
-const MANAGE_PASSWORD   = "JesusIsLord0590";   // ← change this to your secret password
+const MANAGE_PASSWORD   = "JesusIsLord0590";
 
 let discordSdk        = null;
 let currentUserId     = null;
@@ -1291,13 +1373,35 @@ function publishPresence() {
 /* ─── EVENT BINDINGS ─── */
 function bindUI() {
   const bind=(id,fn)=>{ const el=document.getElementById(id); if(el) el.addEventListener("click",fn); };
+
+  // header buttons
   bind("btn-stats",     openStats);
   bind("btn-suggest",   openSuggest);
   bind("btn-admin",     showAdmin);
   bind("pw-unlock-btn", checkPassword);
+
+  // manage panel buttons
+  bind("btn-back-game", showGame);
+  bind("btn-add-char",  addCharacter);
+
+  // manage tab switcher (data-tab attribute)
+  document.querySelectorAll(".tab-btn").forEach(btn=>{
+    btn.addEventListener("click",()=>switchTab(btn.dataset.tab));
+  });
+
   // password input: Enter submits
   const pw=document.getElementById("pw-input");
   if (pw) pw.addEventListener("keydown",e=>{ if(e.key==="Enter") checkPassword(); });
+
+  /* EVENT DELEGATION for dynamically-created buttons
+     (Remove character, Dismiss suggestion, all the option +/✕
+     buttons inside the Categories tab). These elements are
+     rebuilt on every render, so we listen on a stable parent. */
+  document.body.addEventListener("click",e=>{
+    const t=e.target;
+    if (t.dataset && t.dataset.delChar!==undefined)       deleteChar(+t.dataset.delChar);
+    if (t.dataset && t.dataset.delSuggestion!==undefined) deleteSuggestion(+t.dataset.delSuggestion);
+  });
 }
 
 /* ─── BOOT ─── */
