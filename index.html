@@ -56,9 +56,12 @@
   • getRoleGroup()/getElementGroup() read the ACTIVE game's groups.
 
   ── COLOR RULES ───────────────────────────────────────────────────────
-  • correct = exact match (green)
-  • close   = same similarity group — only Role & Element (yellow)
-  • wrong   = no match (gray)
+  • correct = the guess's value-set exactly matches the answer's (green)
+  • close   = sets overlap (share a value) but aren't identical, OR a
+              shared Role/Element similarity group (yellow)
+  • wrong   = nothing shared (red)
+  • Fields can be single values or arrays (multi-value) — see the
+    MULTI-VALUE FIELDS note in the GAME_DATA block below.
 
   ── FEATURES ──────────────────────────────────────────────────────────
   • Theme: gray palette, square (rectangle) buttons.
@@ -467,6 +470,22 @@ window.addEventListener("error",e=>console.warn("[CookieGuess] error:",e.message
      roleSimilarGroups, `rarity`→rarities, `element`→elementGroups.
    • OVENBREAK characters do NOT need an `element` (it's ignored).
 
+   ── MULTI-VALUE FIELDS ──
+   Any field can hold MORE THAN ONE value — write it as an array:
+     { name:"Kohlrabi",
+       arc:["Lower Tower Arc","Melancholy Arc"],
+       affiliation:["Villain","Side-Kick"],
+       role:"Smash", rarity:"Epic", element:"Wind" }
+   Do NOT write "A,B" as one comma string — it must be ["A","B"].
+   A single value can stay a plain string OR be a 1-item array; both
+   work. Scoring for a multi-value field:
+     • GREEN  — the guess's values EXACTLY match the answer's full set.
+                A cookie with 2 arcs only goes green once the guess
+                shares BOTH of its arcs.
+     • YELLOW — the sets aren't identical but share at least one value
+                (for Role/Element, sharing a similarity group counts).
+     • RED    — nothing shared at all.
+
    ── PER-GAME FIELD REFERENCE ──
    `id`              : stable key (used for localStorage) — DON'T change
                        it once players have progress, or their stats reset.
@@ -666,15 +685,62 @@ function getElementGroup(el) {
   }
   return name;
 }
+
+/* ─── MULTI-VALUE SUPPORT ───
+   A character field may be a single string ("Smash") OR an array
+   (["Lower Tower Arc","Melancholy Arc"]). toArr() normalizes both to a
+   clean, lowercase-trimmed array so scoring & display work either way.
+   Single-value characters keep working with no edits — a plain string
+   is just treated as a one-item list. */
+function toArr(v) {
+  if (v==null) return [];
+  const list=Array.isArray(v)?v:[v];
+  return list.map(s=>String(s).trim()).filter(Boolean);
+}
+function lc(arr){ return arr.map(s=>s.toLowerCase()); }
+/* true if the two value-sets are exactly the same set (order-independent) */
+function sameSet(a,b) {
+  const A=[...new Set(lc(a))].sort(), B=[...new Set(lc(b))].sort();
+  return A.length===B.length && A.every((v,i)=>v===B[i]);
+}
+/* true if the two value-sets share at least one value */
+function anyShared(a,b) {
+  const B=new Set(lc(b));
+  return lc(a).some(v=>B.has(v));
+}
+
+/* ─── SCORE ONE CATEGORY ───
+   Works for single OR multi-value fields.
+   • correct (green) : the guess's value-set EXACTLY matches the answer's
+                       full value-set. For a multi-arc cookie you only
+                       get green once your guess shares ALL of its arcs.
+   • close   (yellow): the sets aren't identical but OVERLAP — they share
+                       at least one value. For Role/Element, sharing a
+                       similarity GROUP also counts as overlap.
+   • wrong   (red)   : no shared value and no shared group. */
 function scoreCategory(key, gVal, aVal) {
-  const g=(gVal||"").toLowerCase().trim(), a=(aVal||"").toLowerCase().trim();
-  if (g===a) return "correct";
+  const g=toArr(gVal), a=toArr(aVal);
+
+  // exact full-set match → green
+  if (g.length && a.length && sameSet(g,a)) return "correct";
+
+  // any shared raw value → yellow
+  if (anyShared(g,a)) return "close";
+
+  // Role: any shared similarity group across the two value-sets → yellow
   if (key==="role") {
-    const gG=getRoleGroup(gVal), aG=getRoleGroup(aVal);
-    if (gG && aG && gG===aG) return "close";
+    const gGroups=new Set(g.map(getRoleGroup).filter(Boolean));
+    for (const av of a) {
+      const ag=getRoleGroup(av);
+      if (ag && gGroups.has(ag)) return "close";
+    }
   }
+  // Element: any shared similarity group across the two value-sets → yellow
   if (key==="element") {
-    if (getElementGroup(gVal)===getElementGroup(aVal)) return "close";
+    const gGroups=new Set(g.map(getElementGroup).filter(Boolean));
+    for (const av of a) {
+      if (gGroups.has(getElementGroup(av))) return "close";
+    }
   }
   return "wrong";
 }
@@ -783,11 +849,15 @@ function persistGame() {
 
 /* ─── SCORE GUESS ─── */
 function scoreGuess(guessChar) {
-  return activeCats().map(cat=>({
-    key:cat.key, label:cat.label,
-    value:guessChar[cat.key]||"–",
-    status:scoreCategory(cat.key,guessChar[cat.key],todayChar[cat.key]),
-  }));
+  return activeCats().map(cat=>{
+    const vals=toArr(guessChar[cat.key]);
+    return {
+      key:cat.key, label:cat.label,
+      // join multi-values with " · " for display; "–" if empty
+      value:vals.length?vals.join(" · "):"–",
+      status:scoreCategory(cat.key,guessChar[cat.key],todayChar[cat.key]),
+    };
+  });
 }
 
 /* ─── RENDER GAME ─── */
