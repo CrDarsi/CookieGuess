@@ -37,16 +37,23 @@
   • OVENBREAK is special: it has NO Element category → only 4
     categories AND only 4 attempts. The other two games: 5 + 5.
 
-  ── SHARED OPTIONS ────────────────────────────────────────────────────
-  • Affiliations: Hero / Villain / Neutral / Side-Kick
-  • Role types (classes in same type = "similar"/yellow):
-      Melee:   Ambush, Charge, Defense, Smash, Slash
-      Ranged:  Bomber, Magic, Ranged
-      Support: Assist Buff, Assist Debuff, Healer, Support
-      Special: BTS, Special Guest
-  • Element similarity (same ROW = similar/yellow):
-      Water/Ice, Wind/Grass, Light/Electricity ; standalone:
-      Fire, Earth, Dark, Poison, Steel
+  ── ALL CATEGORIES ARE PER-GAME ───────────────────────────────────────
+  • Every game in GAME_DATA owns its OWN complete set of all 5
+    categories: archs, affiliations, roleSimilarGroups, rarities,
+    elementGroups. Nothing is shared — editing one game never affects
+    another. There is NO `SHARED` object anymore.
+  • The lists START as identical copies of these defaults so the games
+    are playable right away; diverge them per game as needed:
+      Affiliations: Hero / Villain / Neutral / Side-Kick
+      Role types (classes in same type = "similar"/yellow):
+        Melee:   Ambush, Charge, Defense, Smash, Slash
+        Ranged:  Bomber, Magic, Ranged
+        Support: Assist Buff, Assist Debuff, Healer, Support
+        Special: BTS, Special Guest
+      Element similarity (same ROW = similar/yellow):
+        Water/Ice, Wind/Grass, Light/Electricity ; standalone:
+        Fire, Earth, Dark, Poison, Steel
+  • getRoleGroup()/getElementGroup() read the ACTIVE game's groups.
 
   ── COLOR RULES ───────────────────────────────────────────────────────
   • correct = exact match (green)
@@ -440,53 +447,41 @@ window.addEventListener("error",e=>console.warn("[CookieGuess] error:",e.message
 /* ═══════════════════════════════════════════════════════════════════
    ███  HARD-CODED GAME DATA  —  EDIT THIS BLOCK TO MANAGE THE GAME  ███
    ═══════════════════════════════════════════════════════════════════
-   There is no in-app Manage panel anymore. To add/remove characters,
-   rarities or archs, edit the objects below and re-host index.html.
+   There is no in-app Manage panel anymore. To add/remove characters or
+   change ANY category, edit the objects below and re-host index.html.
    Every player sees exactly what is written here.
 
+   ── EVERY CATEGORY IS PER-GAME ──
+   Each game owns its OWN complete set of all 5 categories:
+       archs · affiliations · roleSimilarGroups · rarities · elementGroups
+   Nothing is shared between games. Editing one game never affects the
+   others. The lists below START as copies of a common default so the
+   games are playable immediately — diverge them as needed.
+
    ── HOW TO ADD A CHARACTER ──
-   Put an object inside the game's `characters` array, e.g.:
+   Put an object inside that game's `characters` array, e.g.:
      { name:"Cookie Name", arch:"...", affiliation:"Hero",
        role:"Healer", rarity:"Epic", element:"Fire" }
-   • `arch`, `rarity` must be one of THAT GAME's `archs` / `rarities`.
-   • `affiliation`, `role`, `element` use the SHARED lists further down.
+   • EVERY field must be one of THAT GAME's own category values:
+     `arch`→archs, `affiliation`→affiliations, `role`→a class inside
+     roleSimilarGroups, `rarity`→rarities, `element`→elementGroups.
    • OVENBREAK characters do NOT need an `element` (it's ignored).
 
-   ── PLACEHOLDERS ──
-   `archs` and `rarities` below are PLACEHOLDERS — replace with the real
-   values for each game. Names with "(placeholder)" should be changed.
+   ── PER-GAME FIELD REFERENCE ──
+   `id`              : stable key (used for localStorage) — DON'T change
+                       it once players have progress, or their stats reset.
+   `name`            : label shown on the binder tab.
+   `hasElement`      : false for Ovenbreak → drops the Element category.
+   `maxAttempts`     : 5 normally, 4 for Ovenbreak.
+   `archs`           : this game's arch list (PLACEHOLDERS — edit me).
+   `affiliations`    : this game's affiliation list.
+   `roleSimilarGroups`: this game's role types. Classes inside the SAME
+                       type score "similar" (yellow).
+   `rarities`        : this game's rarities, low → high (PLACEHOLDERS).
+   `elementGroups`   : this game's elements. Same ROW (inner array)
+                       scores "similar" (yellow). Omit/ignore for Ovenbreak.
+   `characters`      : this game's roster (EMPTY — fill me in).
    ═══════════════════════════════════════════════════════════════════ */
-
-/* ── SHARED across all games ── */
-const SHARED = {
-  affiliations: ["Hero","Villain","Neutral","Side-Kick"],
-
-  /* Role types — classes inside the same type score "similar" (yellow). */
-  roleSimilarGroups: {
-    "Melee":   ["Ambush","Charge","Defense","Smash","Slash"],
-    "Ranged":  ["Bomber","Magic","Ranged"],
-    "Support": ["Assist Buff","Assist Debuff","Healer","Support"],
-    "Special": ["BTS","Special Guest"],
-  },
-
-  /* Elements — same ROW (inner array) scores "similar" (yellow). */
-  elementGroups: [
-    ["Water","Ice"],
-    ["Wind","Grass"],
-    ["Light","Electricity"],
-    "Fire","Earth","Dark","Poison","Steel",
-  ],
-};
-
-/* ── THE 3 GAMES ──
-   `id`        : stable internal key (used for localStorage) — DON'T change
-                 it once players have progress, or their stats reset.
-   `name`      : label shown on the binder tab.
-   `hasElement`: false for Ovenbreak → drops the Element category.
-   `maxAttempts`: 5 normally, 4 for Ovenbreak.
-   `rarities`  : per-game, low → high (PLACEHOLDERS — edit me).
-   `archs`     : per-game arch list (PLACEHOLDERS — edit me).
-   `characters`: per-game roster (EMPTY — fill me in). */
 const GAME_DATA = {
 
   /* ───────────── GAME 1 ───────────── */
@@ -495,16 +490,29 @@ const GAME_DATA = {
     name:"Tower of Adventures",
     hasElement:true,
     maxAttempts:5,
+    archs:[
+      "Arch A (placeholder)",
+      "Arch B (placeholder)",
+      "Arch C (placeholder)",
+    ],
+    affiliations:["Hero","Villain","Neutral","Side-Kick"],
+    roleSimilarGroups:{
+      "Melee":   ["Ambush","Charge","Defense","Smash","Slash"],
+      "Ranged":  ["Bomber","Magic","Ranged"],
+      "Support": ["Assist Buff","Assist Debuff","Healer","Support"],
+      "Special": ["BTS","Special Guest"],
+    },
     rarities:[
       "Common (placeholder)",
       "Rare (placeholder)",
       "Epic (placeholder)",
       "Legendary (placeholder)",
     ],
-    archs:[
-      "Arch A (placeholder)",
-      "Arch B (placeholder)",
-      "Arch C (placeholder)",
+    elementGroups:[
+      ["Water","Ice"],
+      ["Wind","Grass"],
+      ["Light","Electricity"],
+      "Fire","Earth","Dark","Poison","Steel",
     ],
     characters:[
       /* example shape — delete this comment and add real entries:
@@ -520,16 +528,29 @@ const GAME_DATA = {
     name:"Kingdom",
     hasElement:true,
     maxAttempts:5,
+    archs:[
+      "Arch A (placeholder)",
+      "Arch B (placeholder)",
+      "Arch C (placeholder)",
+    ],
+    affiliations:["Hero","Villain","Neutral","Side-Kick"],
+    roleSimilarGroups:{
+      "Melee":   ["Ambush","Charge","Defense","Smash","Slash"],
+      "Ranged":  ["Bomber","Magic","Ranged"],
+      "Support": ["Assist Buff","Assist Debuff","Healer","Support"],
+      "Special": ["BTS","Special Guest"],
+    },
     rarities:[
       "Common (placeholder)",
       "Rare (placeholder)",
       "Epic (placeholder)",
       "Legendary (placeholder)",
     ],
-    archs:[
-      "Arch A (placeholder)",
-      "Arch B (placeholder)",
-      "Arch C (placeholder)",
+    elementGroups:[
+      ["Water","Ice"],
+      ["Wind","Grass"],
+      ["Light","Electricity"],
+      "Fire","Earth","Dark","Poison","Steel",
     ],
     characters:[
       /* add Kingdom characters here */
@@ -537,23 +558,33 @@ const GAME_DATA = {
   },
 
   /* ───────────── GAME 3 ─────────────
-     OVENBREAK: no Element category, only 4 attempts. */
+     OVENBREAK: no Element category, only 4 attempts.
+     `elementGroups` is kept for reference but is ignored because
+     `hasElement` is false — you can leave it empty if you prefer. */
   ovenbreak: {
     id:"ovenbreak",
     name:"Ovenbreak",
     hasElement:false,
     maxAttempts:4,
+    archs:[
+      "Arch A (placeholder)",
+      "Arch B (placeholder)",
+      "Arch C (placeholder)",
+    ],
+    affiliations:["Hero","Villain","Neutral","Side-Kick"],
+    roleSimilarGroups:{
+      "Melee":   ["Ambush","Charge","Defense","Smash","Slash"],
+      "Ranged":  ["Bomber","Magic","Ranged"],
+      "Support": ["Assist Buff","Assist Debuff","Healer","Support"],
+      "Special": ["BTS","Special Guest"],
+    },
     rarities:[
       "Common (placeholder)",
       "Rare (placeholder)",
       "Epic (placeholder)",
       "Legendary (placeholder)",
     ],
-    archs:[
-      "Arch A (placeholder)",
-      "Arch B (placeholder)",
-      "Arch C (placeholder)",
-    ],
+    elementGroups:[],   /* ignored — Ovenbreak has no Element category */
     characters:[
       /* add Ovenbreak characters here — element field not needed */
     ],
@@ -607,15 +638,18 @@ function activeCats(){
 }
 function maxAttempts(){ return game().maxAttempts; }
 
-/* ─── SIMILARITY HELPERS ─── */
+/* ─── SIMILARITY HELPERS ───
+   These read the ACTIVE game's own role/element groups, since every
+   category is now per-game (see GAME_DATA above). */
 function getRoleGroup(role) {
-  for (const [type, classes] of Object.entries(SHARED.roleSimilarGroups))
-    if (classes.map(s=>s.toLowerCase()).includes((role||"").toLowerCase())) return type;
+  const groups=game().roleSimilarGroups||{};
+  for (const [type, classes] of Object.entries(groups))
+    if ((classes||[]).map(s=>s.toLowerCase()).includes((role||"").toLowerCase())) return type;
   return null;
 }
 function getElementGroup(el) {
   const name=(el||"").toLowerCase();
-  for (const grp of SHARED.elementGroups) {
+  for (const grp of (game().elementGroups||[])) {
     if (Array.isArray(grp) && grp.map(s=>s.toLowerCase()).includes(name))
       return grp.map(s=>s.toLowerCase()).sort().join("|");
     if (typeof grp==="string" && grp.toLowerCase()===name) return grp.toLowerCase();
