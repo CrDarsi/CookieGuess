@@ -12,50 +12,62 @@
   Activity (Embedded App SDK) inside an iframe. Single self-contained
   index.html — no backend, no build step. Hosted as a static file.
 
-  ── GAME RULES ────────────────────────────────────────────────────────
-  • Guess the daily character by name (NOT letters).
-  • Each guess reveals 5 categories, color-coded:
-      Game · Affiliation · Role · Rarity · Element
-  • Colors:  correct = exact match
-             close   = "similar" category (same similarity group)
-             wrong   = no match
-  • One character per UTC day, same for everyone, refreshes daily.
-  • 8 attempts max. Streak + win-rate tracked per user (localStorage).
+  ── HOW DATA WORKS NOW (IMPORTANT — CHANGED) ──────────────────────────
+  • ALL game content is HARD-CODED in the GAME_DATA block near the top
+    of the FIRST <script>. There is NO in-app Manage panel anymore and
+    NO password/authorization. To change characters/rarities/archs you
+    edit GAME_DATA directly in this file and re-host it.
+  • This guarantees every user sees the SAME content (the old
+    localStorage-based Manage panel only saved data on ONE device, so
+    other users saw an empty game — that bug is now fixed by hard-coding).
+  • localStorage is used ONLY for per-user progress: each player's own
+    guesses, streak and stats. It never stores editable game content.
 
-  ── CATEGORY RULES (set by the user) ──────────────────────────────────
-  • Games: user adds their own (no preloaded characters at all).
-  • Affiliation: Hero / Villain / Neutral.
+  ── GAMES (3) ─────────────────────────────────────────────────────────
+  • "Tower of Adventures", "Kingdom", "Ovenbreak"
+  • Binder-style tabs under the "Cookie Guess" header switch between
+    them. Each game is its OWN independent daily puzzle with its OWN
+    answer. The answer is the same for all users (UTC-seeded pick).
+  • Each game has its OWN characters, OWN rarities and OWN archs.
+
+  ── CATEGORIES (per guess) ────────────────────────────────────────────
+  • Arch · Affiliation · Role · Rarity · Element
+  • The old "Game" category is GONE (each puzzle is one game already).
+  • "Arch" is the new per-game category (placeholder list per game).
+  • OVENBREAK is special: it has NO Element category → only 4
+    categories AND only 4 attempts. The other two games: 5 + 5.
+
+  ── SHARED OPTIONS ────────────────────────────────────────────────────
+  • Affiliations: Hero / Villain / Neutral / Side-Kick
   • Role types (classes in same type = "similar"/yellow):
       Melee:   Ambush, Charge, Defense, Smash, Slash
       Ranged:  Bomber, Magic, Ranged
       Support: Assist Buff, Assist Debuff, Healer, Support
       Special: BTS, Special Guest
-  • Rarities (low→high): Common, Uncommon, Rare, Epic, Super Epic,
-      Legendary, Ancients, Beasts, Dragon
-  • Element similarity (a "/" pair = similar/yellow):
+  • Element similarity (same ROW = similar/yellow):
       Water/Ice, Wind/Grass, Light/Electricity ; standalone:
       Fire, Earth, Dark, Poison, Steel
-  • All categories/options are editable in-app via Manage → Categories.
 
-  ── FEATURES BUILT ────────────────────────────────────────────────────
+  ── COLOR RULES ───────────────────────────────────────────────────────
+  • correct = exact match (green)
+  • close   = same similarity group — only Role & Element (yellow)
+  • wrong   = no match (gray)
+
+  ── FEATURES ──────────────────────────────────────────────────────────
   • Theme: gray palette, square (rectangle) buttons.
   • Left sidebar: "Playing now" — live participant list (Discord SDK).
-  • Header: Stats button, Suggest button, streak badge, Manage button.
-  • Stats modal: per-player color grids + win rate / current / best streak.
-  • Suggest modal: a player may suggest ONE character per day, ONLY
-      after they win that day. Submissions show in Manage → Suggestions.
-  • Manage panel is PASSWORD-gated (not user-ID gated). Once the correct
-      password is entered it is remembered (localStorage key
-      cg_manage_unlocked) so it is never asked again on that device.
-  • Manage tabs: Characters (add/remove), Categories (edit all options),
-      Suggestions (review/dismiss player suggestions).
+  • Header: Stats button, Suggest button, per-game streak badge.
+  • Game tabs (binder style) under the logo.
+  • Stats modal: per-player color grids + win rate / current / best
+    streak, all PER-GAME (the active tab's game).
+  • Suggest modal: a player may suggest ONE character per day per game,
+    ONLY after they win that game that day.
   • Discord chat presence: setActivity publishes "X was playing" /
-      "X and Y were playing" / "X, Y and Z were playing".
+    "X and Y were playing" / "X, Y and Z were playing".
 
-  ── CONFIG (already filled in) ────────────────────────────────────────
+  ── CONFIG ────────────────────────────────────────────────────────────
   • DISCORD_CLIENT_ID = "1505740299220029662"
-  • MANAGE_PASSWORD   = "JesusIsLord0590"
-  (These live in the 2nd JS block. Keep them when editing.)
+  • There is NO MANAGE_PASSWORD anymore (Manage panel removed).
 
   ── KNOWN DISCORD-WEBVIEW GOTCHAS (already handled, keep handling) ─────
   • window.prompt()/alert() are BLOCKED in the Discord iframe — never
@@ -63,20 +75,16 @@
   • Inline onclick="" attributes are UNRELIABLE in the Discord webview —
     ALL buttons must be wired via addEventListener in bindUI(), and
     dynamically-created buttons via event delegation on document.body.
-  • structuredClone may be missing — cloneDefaults() has a JSON fallback.
+  • structuredClone may be missing — clone() has a JSON fallback.
+  • authorize() is NOT called anymore — it was prompting on every open.
+    Identity is read from whatever the SDK exposes without a popup.
 
   ── OUTSTANDING / NOT YET DONE ────────────────────────────────────────
+  • Fill in real characters in GAME_DATA[*].characters (empty arrays).
+  • Replace placeholder rarities/archs in GAME_DATA with real values.
   • Showing OTHER players' actual guess grids in Stats/Presence needs a
     backend (or Discord activity state sync) to share game state. The UI
-    is ready; presencePlayers[].grid just needs to be populated. Your
-    own data always shows correctly. This is the main remaining piece.
-
-  ── LAST WORKING SESSION ──────────────────────────────────────────────
-  • Fixed: Manage-tab buttons (Back to game, tabs, Add Character,
-    Remove, Dismiss) were dead because they had no event listeners —
-    now all wired in bindUI() incl. event delegation for dynamic ones.
-  • Removed the ✕ Close buttons from all modals (click outside to close).
-  • Baked in the Client ID + password above.
+    is ready; presencePlayers[].grid just needs to be populated.
 ═══════════════════════════════════════════════════════════════════════
 -->
 <html lang="en">
@@ -91,10 +99,10 @@
       /* ── GRAY PALETTE ── */
       --bg:#101012;--surface:#1a1a1d;--surface2:#232327;--border:#323236;
       --muted:#4a4a50;--text:#e8e8ea;--sub:#8a8a90;
-      /* result colors */
-      --correct:#7d8a6e;--correct-bg:#252a20;--correct-border:#4a543c;
-      --close:#bfa94a;--close-bg:#2b2715;--close-border:#5c5224;
-      --wrong:#3a3a40;--wrong-bg:#1c1c1f;--wrong-border:#2e2e32;
+      /* result colors — vibrant green / amber, red for wrong */
+      --correct:#7ec85a;--correct-bg:#1f3318;--correct-border:#4f8a36;
+      --close:#e6b93f;--close-bg:#3a3010;--close-border:#9c7e22;
+      --wrong:#d65a5a;--wrong-bg:#311a1a;--wrong-border:#7a3232;
       /* accent (neutral light gray for primary actions) */
       --accent:#6b6b72;--accent-hover:#7d7d85;
       --radius:4px;--font-head:'Bebas Neue',sans-serif;--font-body:'DM Sans',sans-serif;
@@ -163,6 +171,41 @@
       background:var(--surface);border:1px solid var(--border);
       border-radius:var(--radius);padding:6px 11px;
       display:flex;align-items:center;gap:5px;white-space:nowrap}
+
+    /* ── GAME TABS (binder style) ── */
+    #game-tabs{width:100%;max-width:660px;display:flex;gap:0;
+      border-bottom:1px solid var(--border);flex-wrap:wrap}
+    .game-tab{font-family:var(--font-head);font-size:0.95rem;letter-spacing:1.4px;
+      color:var(--sub);background:var(--surface);
+      border:1px solid var(--border);border-bottom:none;
+      border-radius:var(--radius) var(--radius) 0 0;
+      padding:9px 16px;cursor:pointer;position:relative;top:1px;
+      transition:color .2s ease,background .2s ease,transform .18s ease,
+        box-shadow .2s ease;white-space:nowrap;margin-right:3px;
+      overflow:hidden;
+      /* entrance animation — each tab eased in by JS-set delay */
+      animation:tabIn .35s cubic-bezier(.34,1.2,.64,1) both}
+    @keyframes tabIn{from{opacity:0;transform:translateY(8px)}
+      to{opacity:1;transform:translateY(0)}}
+    /* sliding accent underline (grows from center on hover/active) */
+    .game-tab::after{content:'';position:absolute;left:50%;right:50%;bottom:0;
+      height:2px;background:var(--accent-hover);
+      transition:left .22s ease,right .22s ease}
+    .game-tab:hover{color:var(--text);background:var(--surface2);
+      transform:translateY(-2px);
+      box-shadow:0 -3px 10px rgba(0,0,0,0.35)}
+    .game-tab:hover::after{left:14%;right:14%}
+    .game-tab:active{transform:translateY(0);transition-duration:.08s}
+    .game-tab.active{color:var(--text);background:var(--bg);
+      border-color:var(--border);border-bottom:1px solid var(--bg);
+      transform:translateY(0)}
+    .game-tab.active::after{left:0;right:0;
+      background:var(--accent);height:2px;
+      box-shadow:0 0 8px var(--accent)}
+    @media(max-width:560px){
+      .game-tab{font-size:0.82rem;padding:7px 11px;letter-spacing:1px}
+    }
+
     .timer-bar{font-size:0.7rem;color:var(--sub)}
     .legend{display:flex;gap:12px;flex-wrap:wrap;justify-content:center;font-size:0.7rem;color:var(--sub)}
     .legend-item{display:flex;align-items:center;gap:5px}
@@ -195,12 +238,12 @@
     .attempts-bar{font-size:0.7rem;color:var(--sub)}
     #empty-state{display:none;text-align:center;padding:30px 20px;color:var(--sub);font-size:0.85rem;line-height:1.7}
     #empty-state strong{color:var(--text);display:block;font-size:1rem;margin-bottom:6px}
-    .cat-header{width:100%;max-width:660px;display:grid;grid-template-columns:130px repeat(5,1fr);gap:4px}
+    .cat-header{width:100%;max-width:660px;display:grid;gap:4px}
     .cat-label{font-size:0.6rem;font-weight:600;letter-spacing:0.6px;text-transform:uppercase;
       color:var(--sub);text-align:center;padding:3px 2px}
     .cat-label:first-child{text-align:left;padding-left:6px}
     #guesses{width:100%;max-width:660px;display:flex;flex-direction:column;gap:5px}
-    .guess-row{display:grid;grid-template-columns:130px repeat(5,1fr);gap:4px;animation:rowIn .25s ease both}
+    .guess-row{display:grid;gap:4px;animation:rowIn .25s ease both}
     @keyframes rowIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
     .guess-name-cell{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
       padding:7px 9px;font-size:0.78rem;font-weight:600;display:flex;align-items:center;
@@ -216,9 +259,6 @@
     .cat-cell.close{background:var(--close-bg);border-color:var(--close-border);color:var(--close)}
     .cat-cell.wrong{background:var(--wrong-bg);border-color:var(--wrong-border);color:var(--sub)}
     @keyframes flipIn{from{opacity:0;transform:rotateX(-55deg) scale(0.92)}to{opacity:1;transform:rotateX(0) scale(1)}}
-    .cat-cell:nth-child(2){animation-delay:.06s}.cat-cell:nth-child(3){animation-delay:.14s}
-    .cat-cell:nth-child(4){animation-delay:.22s}.cat-cell:nth-child(5){animation-delay:.30s}
-    .cat-cell:nth-child(6){animation-delay:.38s}
     #result-banner{display:none;width:100%;max-width:660px;background:var(--surface);
       border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;
       text-align:center;animation:rowIn .3s ease both}
@@ -234,75 +274,6 @@
     .banner-btn:hover{background:var(--accent-hover)}
     .banner-btn.secondary{background:var(--surface2);border:1px solid var(--border);color:var(--text)}
     .banner-btn.secondary:hover{background:var(--border)}
-
-    /* ── ADMIN VIEW ── */
-    #view-admin{min-height:100%;padding:20px 16px 48px;align-items:center;gap:18px}
-    .admin-header{width:100%;max-width:720px;display:flex;align-items:center;justify-content:space-between}
-    .admin-title{font-family:var(--font-head);font-size:1.6rem;letter-spacing:2px;color:var(--text)}
-    .btn-back{font-size:0.78rem;font-weight:600;color:var(--sub);background:var(--surface);
-      border:1px solid var(--border);border-radius:var(--radius);padding:6px 14px;cursor:pointer;transition:color .15s}
-    .btn-back:hover{color:var(--text)}
-    .admin-tabs{width:100%;max-width:720px;display:flex;gap:4px;background:var(--surface);
-      border:1px solid var(--border);border-radius:var(--radius);padding:4px}
-    .tab-btn{flex:1;padding:7px 4px;border:none;border-radius:var(--radius);background:transparent;
-      color:var(--sub);font-family:var(--font-body);font-size:0.78rem;font-weight:600;
-      cursor:pointer;transition:background .15s,color .15s}
-    .tab-btn.active{background:var(--border);color:var(--text)}
-    .tab-panel{display:none;width:100%;max-width:720px}
-    .tab-panel.active{display:block}
-    .section-title{font-size:0.7rem;font-weight:600;letter-spacing:0.8px;text-transform:uppercase;
-      color:var(--sub);margin-bottom:10px}
-    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
-    @media(max-width:480px){.form-grid{grid-template-columns:1fr}}
-    .form-field{display:flex;flex-direction:column;gap:5px}
-    .form-field label{font-size:0.72rem;color:var(--sub);font-weight:500}
-    .form-field select,.form-field input[type=text]{background:var(--surface);border:1px solid var(--border);
-      border-radius:var(--radius);color:var(--text);font-family:var(--font-body);font-size:0.85rem;
-      padding:8px 10px;outline:none;transition:border-color .2s}
-    .form-field select:focus,.form-field input[type=text]:focus{border-color:var(--accent)}
-    .form-field select option{background:#232327}
-    .form-full{grid-column:1/-1}
-    .btn-add-char{width:100%;padding:10px;border:none;border-radius:var(--radius);
-      background:var(--accent);color:#fff;font-family:var(--font-head);font-size:1rem;
-      letter-spacing:1px;cursor:pointer;transition:background .2s}
-    .btn-add-char:hover{background:var(--accent-hover)}
-    #char-list{display:flex;flex-direction:column;gap:6px;margin-top:16px}
-    .char-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
-      padding:10px 14px;display:flex;align-items:center;gap:10px}
-    .char-card-info{flex:1;min-width:0}
-    .char-card-name{font-size:0.88rem;font-weight:600}
-    .char-card-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:4px}
-    .tag{font-size:0.6rem;font-weight:600;padding:2px 7px;border-radius:2px;border:1px solid;
-      color:var(--sub);border-color:var(--border);background:var(--surface2)}
-    .btn-del{background:none;border:1px solid var(--border);border-radius:var(--radius);color:var(--sub);
-      padding:4px 10px;font-size:0.72rem;cursor:pointer;transition:color .15s,border-color .15s;flex-shrink:0}
-    .btn-del:hover{color:#d98a8a;border-color:#5c3838}
-    .options-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
-    @media(max-width:520px){.options-grid{grid-template-columns:1fr}}
-    .options-block{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);padding:14px}
-    .options-block-title{font-size:0.72rem;font-weight:600;letter-spacing:0.6px;
-      text-transform:uppercase;color:var(--sub);margin-bottom:10px}
-    .option-tags{display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px}
-    .option-tag{display:flex;align-items:center;gap:5px;background:var(--surface2);
-      border:1px solid var(--border);border-radius:var(--radius);padding:3px 8px 3px 10px;
-      font-size:0.75rem;color:var(--text)}
-    .option-tag .rm{cursor:pointer;color:var(--muted);font-size:0.8rem;transition:color .15s;line-height:1}
-    .option-tag .rm:hover{color:#d98a8a}
-    .option-group-label{font-size:0.65rem;color:var(--sub);font-weight:600;text-transform:uppercase;
-      letter-spacing:0.5px;margin-bottom:4px;margin-top:8px}
-    .add-option-row{display:flex;gap:6px}
-    .add-option-row input{flex:1;background:var(--surface2);border:1px solid var(--border);
-      border-radius:var(--radius);color:var(--text);font-family:var(--font-body);font-size:0.8rem;padding:6px 10px;outline:none}
-    .add-option-row input:focus{border-color:var(--accent)}
-    .btn-add-opt{background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);
-      color:var(--text);font-size:0.8rem;font-weight:600;padding:6px 12px;cursor:pointer;transition:background .15s}
-    .btn-add-opt:hover{background:var(--border)}
-    .role-type-block{margin-bottom:10px}
-    .suggestion-card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);
-      padding:10px 14px;display:flex;align-items:center;gap:10px;margin-bottom:6px}
-    .suggestion-card .s-info{flex:1;min-width:0}
-    .suggestion-card .s-name{font-size:0.86rem;font-weight:600}
-    .suggestion-card .s-meta{font-size:0.68rem;color:var(--sub);margin-top:2px}
 
     /* ── MODAL ── */
     .modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.72);z-index:200;
@@ -325,7 +296,7 @@
       font-size:1.1rem;font-weight:700;color:var(--text)}
     .spc-name{font-size:0.72rem;font-weight:600;text-align:center;white-space:nowrap;
       overflow:hidden;text-overflow:ellipsis;max-width:100%}
-    .spc-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:2px;width:100%}
+    .spc-grid{display:grid;gap:2px;width:100%}
     .spc-cell{aspect-ratio:1;border-radius:1px;background:var(--wrong-bg)}
     .spc-cell.correct{background:var(--correct)}
     .spc-cell.close{background:var(--close)}
@@ -346,6 +317,20 @@
     .sug-locked{font-size:0.82rem;color:var(--close);background:var(--close-bg);
       border:1px solid var(--close-border);border-radius:var(--radius);
       padding:12px 14px;line-height:1.5}
+    .form-grid{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:14px}
+    @media(max-width:480px){.form-grid{grid-template-columns:1fr}}
+    .form-field{display:flex;flex-direction:column;gap:5px}
+    .form-field label{font-size:0.72rem;color:var(--sub);font-weight:500}
+    .form-field input[type=text]{background:var(--surface);border:1px solid var(--border);
+      border-radius:var(--radius);color:var(--text);font-family:var(--font-body);font-size:0.85rem;
+      padding:8px 10px;outline:none;transition:border-color .2s}
+    .form-field input[type=text]:focus{border-color:var(--accent)}
+    .form-full{grid-column:1/-1}
+    .btn-add-char{width:100%;padding:10px;border:none;border-radius:var(--radius);
+      background:var(--accent);color:#fff;font-family:var(--font-head);font-size:1rem;
+      letter-spacing:1px;cursor:pointer;transition:background .2s}
+    .btn-add-char:hover{background:var(--accent-hover)}
+
     #toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%) translateY(20px);
       background:var(--surface2);border:1px solid var(--border);border-radius:var(--radius);padding:8px 18px;
       font-size:0.8rem;color:var(--text);opacity:0;transition:opacity .2s,transform .2s;
@@ -376,9 +361,12 @@
           <button class="hbtn" id="btn-stats">📊 Stats</button>
           <button class="hbtn" id="btn-suggest">💡 Suggest</button>
           <div class="streak-badge">🔥 <span id="streak-count">0 day streak</span></div>
-          <button class="hbtn" id="btn-admin">⚙ Manage</button>
         </div>
       </header>
+
+      <!-- BINDER-STYLE GAME TABS (populated by JS) -->
+      <div id="game-tabs"></div>
+
       <div class="timer-bar">Next character in: <span id="countdown">–</span></div>
       <div class="legend">
         <div class="legend-item"><div class="legend-dot ld-correct"></div>Correct</div>
@@ -392,62 +380,19 @@
         </div>
         <button class="btn-submit" id="btn-submit">GUESS</button>
       </div>
-      <div class="attempts-bar">Attempt <span id="attempt-num">1</span> / 8</div>
+      <div class="attempts-bar">Attempt <span id="attempt-num">1</span> / <span id="attempt-max">5</span></div>
       <div id="empty-state">
         <strong>No characters added yet</strong>
-        The manager needs to add characters via ⚙ Manage.<br>
+        Add characters for this game in the GAME_DATA block of index.html.<br>
         Once at least one exists, the game begins!
       </div>
-      <div class="cat-header" id="cat-header" style="display:none">
-        <div class="cat-label">Character</div>
-        <div class="cat-label">Game</div>
-        <div class="cat-label">Affiliation</div>
-        <div class="cat-label">Role</div>
-        <div class="cat-label">Rarity</div>
-        <div class="cat-label">Element</div>
-      </div>
+      <div class="cat-header" id="cat-header" style="display:none"></div>
       <div id="guesses"></div>
       <div id="result-banner">
         <h2 id="result-title"></h2>
         <p id="result-body"></p>
         <p class="next-time" id="next-time-text"></p>
         <div class="banner-actions" id="banner-actions"></div>
-      </div>
-    </div>
-
-    <!-- ADMIN VIEW -->
-    <div id="view-admin" class="view">
-      <div class="admin-header">
-        <div class="admin-title">⚙ Manage</div>
-        <button class="btn-back" id="btn-back-game">← Back to game</button>
-      </div>
-      <div class="admin-tabs">
-        <button class="tab-btn active" data-tab="characters">Characters</button>
-        <button class="tab-btn" data-tab="options">Categories</button>
-        <button class="tab-btn" data-tab="suggestions">Suggestions</button>
-      </div>
-      <div class="tab-panel active" id="tab-characters">
-        <div class="section-title">Add a new character</div>
-        <div class="form-grid">
-          <div class="form-field form-full">
-            <label>Character Name</label>
-            <input type="text" id="f-name" placeholder="e.g. Kaelthas" />
-          </div>
-          <div class="form-field"><label>Game</label><select id="f-game"></select></div>
-          <div class="form-field"><label>Affiliation</label><select id="f-affiliation"></select></div>
-          <div class="form-field"><label>Role (Class)</label><select id="f-role"></select></div>
-          <div class="form-field"><label>Rarity</label><select id="f-rarity"></select></div>
-          <div class="form-field form-full"><label>Element</label><select id="f-element"></select></div>
-        </div>
-        <button class="btn-add-char" id="btn-add-char">+ Add Character</button>
-        <div id="char-list"></div>
-      </div>
-      <div class="tab-panel" id="tab-options">
-        <div class="options-grid" id="options-grid"></div>
-      </div>
-      <div class="tab-panel" id="tab-suggestions">
-        <div class="section-title">Player-submitted suggestions</div>
-        <div id="suggestion-list"></div>
       </div>
     </div>
 
@@ -458,11 +403,11 @@
 <div class="modal-overlay" id="stats-modal">
   <div class="modal">
     <div class="modal-head">
-      <div class="modal-title">📊 Today's Players</div>
+      <div class="modal-title">📊 <span id="stats-title">Today's Players</span></div>
     </div>
     <div class="stats-players" id="stats-players"></div>
     <div class="stats-general">
-      <div class="sg-title">Your General Statistics</div>
+      <div class="sg-title" id="sg-title">Your Statistics</div>
       <div class="sg-row">
         <div class="sg-stat"><div class="sg-num" id="sg-winrate">0%</div><div class="sg-label">Win Rate</div></div>
         <div class="sg-stat"><div class="sg-num" id="sg-current">0</div><div class="sg-label">Current Streak</div></div>
@@ -482,21 +427,6 @@
   </div>
 </div>
 
-<!-- PASSWORD MODAL -->
-<div class="modal-overlay" id="pw-modal">
-  <div class="modal" style="max-width:380px">
-    <div class="modal-head">
-      <div class="modal-title">🔒 Manage Access</div>
-    </div>
-    <div class="sug-note">Enter the manager password to access the Manage panel.</div>
-    <div class="form-field" style="margin-bottom:12px">
-      <label>Password</label>
-      <input type="password" id="pw-input" placeholder="Password" />
-    </div>
-    <button class="btn-add-char" id="pw-unlock-btn">Unlock</button>
-  </div>
-</div>
-
 <div id="toast"></div>
 
 <script>
@@ -507,64 +437,200 @@ window.addEventListener("error",e=>console.warn("[CookieGuess] error:",e.message
 </script>
 
 <script>
-/* ─── STORAGE KEYS ─── */
-const SK = {
-  chars:"cg_chars_v1", opts:"cg_opts_v1", game:"cg_game_v1",
-  streak:"cg_streak_v1", stats:"cg_stats_v1", suggest:"cg_suggest_v1"
-};
-const load = k => { try { return JSON.parse(localStorage.getItem(k)) || null } catch { return null } };
-const save = (k,v) => localStorage.setItem(k, JSON.stringify(v));
+/* ═══════════════════════════════════════════════════════════════════
+   ███  HARD-CODED GAME DATA  —  EDIT THIS BLOCK TO MANAGE THE GAME  ███
+   ═══════════════════════════════════════════════════════════════════
+   There is no in-app Manage panel anymore. To add/remove characters,
+   rarities or archs, edit the objects below and re-host index.html.
+   Every player sees exactly what is written here.
 
-/* ─── DEFAULT OPTIONS ─── */
-const DEFAULTS = {
-  games: [],
-  affiliations: ["Hero","Villain","Neutral"],
+   ── HOW TO ADD A CHARACTER ──
+   Put an object inside the game's `characters` array, e.g.:
+     { name:"Cookie Name", arch:"...", affiliation:"Hero",
+       role:"Healer", rarity:"Epic", element:"Fire" }
+   • `arch`, `rarity` must be one of THAT GAME's `archs` / `rarities`.
+   • `affiliation`, `role`, `element` use the SHARED lists further down.
+   • OVENBREAK characters do NOT need an `element` (it's ignored).
+
+   ── PLACEHOLDERS ──
+   `archs` and `rarities` below are PLACEHOLDERS — replace with the real
+   values for each game. Names with "(placeholder)" should be changed.
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* ── SHARED across all games ── */
+const SHARED = {
+  affiliations: ["Hero","Villain","Neutral","Side-Kick"],
+
+  /* Role types — classes inside the same type score "similar" (yellow). */
   roleSimilarGroups: {
     "Melee":   ["Ambush","Charge","Defense","Smash","Slash"],
     "Ranged":  ["Bomber","Magic","Ranged"],
     "Support": ["Assist Buff","Assist Debuff","Healer","Support"],
     "Special": ["BTS","Special Guest"],
   },
-  rarities: ["Common","Uncommon","Rare","Epic","Super Epic","Legendary","Ancients","Beasts","Dragon"],
+
+  /* Elements — same ROW (inner array) scores "similar" (yellow). */
   elementGroups: [
-    ["Water","Ice"],["Wind","Grass"],["Light","Electricity"],
-    "Fire","Earth","Dark","Poison","Steel"
+    ["Water","Ice"],
+    ["Wind","Grass"],
+    ["Light","Electricity"],
+    "Fire","Earth","Dark","Poison","Steel",
   ],
 };
-const getOpts  = () => load(SK.opts)   || cloneDefaults();
-function cloneDefaults() {
+
+/* ── THE 3 GAMES ──
+   `id`        : stable internal key (used for localStorage) — DON'T change
+                 it once players have progress, or their stats reset.
+   `name`      : label shown on the binder tab.
+   `hasElement`: false for Ovenbreak → drops the Element category.
+   `maxAttempts`: 5 normally, 4 for Ovenbreak.
+   `rarities`  : per-game, low → high (PLACEHOLDERS — edit me).
+   `archs`     : per-game arch list (PLACEHOLDERS — edit me).
+   `characters`: per-game roster (EMPTY — fill me in). */
+const GAME_DATA = {
+
+  /* ───────────── GAME 1 ───────────── */
+  toa: {
+    id:"toa",
+    name:"Tower of Adventures",
+    hasElement:true,
+    maxAttempts:5,
+    rarities:[
+      "Common (placeholder)",
+      "Rare (placeholder)",
+      "Epic (placeholder)",
+      "Legendary (placeholder)",
+    ],
+    archs:[
+      "Arch A (placeholder)",
+      "Arch B (placeholder)",
+      "Arch C (placeholder)",
+    ],
+    characters:[
+      /* example shape — delete this comment and add real entries:
+      { name:"Example", arch:"Arch A (placeholder)", affiliation:"Hero",
+        role:"Healer", rarity:"Epic (placeholder)", element:"Fire" },
+      */
+    ],
+  },
+
+  /* ───────────── GAME 2 ───────────── */
+  kingdom: {
+    id:"kingdom",
+    name:"Kingdom",
+    hasElement:true,
+    maxAttempts:5,
+    rarities:[
+      "Common (placeholder)",
+      "Rare (placeholder)",
+      "Epic (placeholder)",
+      "Legendary (placeholder)",
+    ],
+    archs:[
+      "Arch A (placeholder)",
+      "Arch B (placeholder)",
+      "Arch C (placeholder)",
+    ],
+    characters:[
+      /* add Kingdom characters here */
+    ],
+  },
+
+  /* ───────────── GAME 3 ─────────────
+     OVENBREAK: no Element category, only 4 attempts. */
+  ovenbreak: {
+    id:"ovenbreak",
+    name:"Ovenbreak",
+    hasElement:false,
+    maxAttempts:4,
+    rarities:[
+      "Common (placeholder)",
+      "Rare (placeholder)",
+      "Epic (placeholder)",
+      "Legendary (placeholder)",
+    ],
+    archs:[
+      "Arch A (placeholder)",
+      "Arch B (placeholder)",
+      "Arch C (placeholder)",
+    ],
+    characters:[
+      /* add Ovenbreak characters here — element field not needed */
+    ],
+  },
+
+};
+
+/* Tab display order. */
+const GAME_ORDER = ["toa","kingdom","ovenbreak"];
+
+/* ═══════════════════════════════════════════════════════════════════
+   ███  END OF EDITABLE GAME DATA  ███
+   ═══════════════════════════════════════════════════════════════════ */
+
+
+/* ─── STORAGE (per-user progress ONLY — never game content) ─── */
+/* Keys are namespaced per game id, e.g. cg_game_toa, cg_streak_kingdom. */
+const SK = {
+  game   : g => `cg_game_${g}`,
+  streak : g => `cg_streak_${g}`,
+  stats  : g => `cg_stats_${g}`,
+  suggest: "cg_suggest_v2",      // suggestions list (all games)
+  lastTab: "cg_last_tab",        // remembers which game tab was open
+};
+const load = k => { try { return JSON.parse(localStorage.getItem(k)) || null } catch { return null } };
+const save = (k,v) => localStorage.setItem(k, JSON.stringify(v));
+function clone(o){
   // structuredClone isn't available in all Discord webviews
-  try { return structuredClone(DEFAULTS); }
-  catch { return JSON.parse(JSON.stringify(DEFAULTS)); }
+  try { return structuredClone(o); }
+  catch { return JSON.parse(JSON.stringify(o)); }
 }
-const saveOpts = o  => save(SK.opts, o);
-const getChars = () => load(SK.chars)  || [];
-const saveChars= c  => save(SK.chars, c);
+
+/* ─── ACTIVE GAME ─── */
+let activeGameId = (()=>{
+  const saved = localStorage.getItem(SK.lastTab);
+  return GAME_ORDER.includes(saved) ? saved : GAME_ORDER[0];
+})();
+function game(){ return GAME_DATA[activeGameId]; }
+
+/* The categories shown for the active game.
+   Ovenbreak omits "element". */
+function activeCats(){
+  const base=[
+    {key:"arch",       label:"Arch"},
+    {key:"affiliation",label:"Affiliation"},
+    {key:"role",       label:"Role"},
+    {key:"rarity",     label:"Rarity"},
+  ];
+  if (game().hasElement) base.push({key:"element",label:"Element"});
+  return base;
+}
+function maxAttempts(){ return game().maxAttempts; }
 
 /* ─── SIMILARITY HELPERS ─── */
-function getRoleGroup(role, opts) {
-  for (const [type, classes] of Object.entries(opts.roleSimilarGroups))
+function getRoleGroup(role) {
+  for (const [type, classes] of Object.entries(SHARED.roleSimilarGroups))
     if (classes.map(s=>s.toLowerCase()).includes((role||"").toLowerCase())) return type;
   return null;
 }
-function getElementGroup(el, opts) {
+function getElementGroup(el) {
   const name=(el||"").toLowerCase();
-  for (const grp of opts.elementGroups) {
+  for (const grp of SHARED.elementGroups) {
     if (Array.isArray(grp) && grp.map(s=>s.toLowerCase()).includes(name))
       return grp.map(s=>s.toLowerCase()).sort().join("|");
     if (typeof grp==="string" && grp.toLowerCase()===name) return grp.toLowerCase();
   }
   return name;
 }
-function scoreCategory(key, gVal, aVal, opts) {
+function scoreCategory(key, gVal, aVal) {
   const g=(gVal||"").toLowerCase().trim(), a=(aVal||"").toLowerCase().trim();
   if (g===a) return "correct";
   if (key==="role") {
-    const gG=getRoleGroup(gVal,opts), aG=getRoleGroup(aVal,opts);
+    const gG=getRoleGroup(gVal), aG=getRoleGroup(aVal);
     if (gG && aG && gG===aG) return "close";
   }
   if (key==="element") {
-    if (getElementGroup(gVal,opts)===getElementGroup(aVal,opts)) return "close";
+    if (getElementGroup(gVal)===getElementGroup(aVal)) return "close";
   }
   return "wrong";
 }
@@ -578,60 +644,105 @@ function yesterdayKey() {
   const d=new Date(); d.setUTCDate(d.getUTCDate()-1);
   return `${d.getUTCFullYear()}-${d.getUTCMonth()}-${d.getUTCDate()}`;
 }
+/* Seeded so every user gets the same daily answer.
+   Seed includes the game id so each game picks independently. */
 function seededPick(seed, arr) {
   let h=0;
   for (let i=0;i<seed.length;i++) h=Math.imul(31,h)+seed.charCodeAt(i)|0;
   return arr[Math.abs(h)%arr.length];
 }
 
-/* ─── CATEGORIES ─── */
-const CATS=[
-  {key:"game",label:"Game"},{key:"affiliation",label:"Affiliation"},
-  {key:"role",label:"Role"},{key:"rarity",label:"Rarity"},{key:"element",label:"Element"},
-];
-const MAX_ATT=8;
+/* ─── GAME STATE (for the active game) ─── */
 let todayChar=null, guesses=[], gameOver=false, won=false;
 
-/* ─── INIT GAME ─── */
+/* ─── BUILD GAME TABS ─── */
+function renderGameTabs() {
+  const wrap=document.getElementById("game-tabs");
+  wrap.innerHTML=GAME_ORDER.map(id=>{
+    const g=GAME_DATA[id];
+    return `<button class="game-tab${id===activeGameId?" active":""}" data-game="${id}">${g.name}</button>`;
+  }).join("");
+  wrap.querySelectorAll(".game-tab").forEach((btn,i)=>{
+    // staggered cascade entrance
+    btn.style.animationDelay=`${i*0.07}s`;
+    btn.addEventListener("click",()=>switchGame(btn.dataset.game));
+  });
+}
+function switchGame(id) {
+  if (!GAME_DATA[id] || id===activeGameId) {
+    // still re-render tabs in case of first call
+  }
+  activeGameId=id;
+  localStorage.setItem(SK.lastTab,id);
+  renderGameTabs();
+  initGame();
+  publishPresence();
+}
+
+/* ─── INIT GAME (for activeGameId) ─── */
 function initGame() {
-  const chars=getChars(), tKey=todayKey();
+  const chars=game().characters, tKey=todayKey();
+
+  // Set the grid template columns to match the category count.
+  const colCount=activeCats().length;
+  const tmpl=`130px repeat(${colCount},1fr)`;
+  document.getElementById("cat-header").style.gridTemplateColumns=tmpl;
+
+  // category header labels
+  const catHeader=document.getElementById("cat-header");
+  catHeader.innerHTML=`<div class="cat-label">Character</div>`+
+    activeCats().map(c=>`<div class="cat-label">${c.label}</div>`).join("");
+
+  // attempts label
+  document.getElementById("attempt-max").textContent=maxAttempts();
+
   if (!chars.length) {
     document.getElementById("empty-state").style.display="block";
     document.getElementById("cat-header").style.display="none";
+    document.getElementById("guesses").innerHTML="";
     document.getElementById("btn-submit").disabled=true;
     document.getElementById("guess-input").disabled=true;
     document.getElementById("result-banner").classList.remove("show");
-    startCountdown(); return;
+    todayChar=null; guesses=[]; gameOver=false; won=false;
+    updateStreakBadge();
+    startCountdown();
+    return;
   }
   document.getElementById("empty-state").style.display="none";
   document.getElementById("cat-header").style.display="grid";
   document.getElementById("btn-submit").disabled=false;
   document.getElementById("guess-input").disabled=false;
+  document.getElementById("guess-input").value="";
 
-  todayChar=seededPick(tKey, chars);
-  const saved=load(SK.game);
+  // Seed includes the game id so each game has its own answer.
+  todayChar=seededPick(`${tKey}-${activeGameId}`, chars);
+
+  const saved=load(SK.game(activeGameId));
   if (saved && saved.key===tKey && saved.charName===todayChar.name) {
     guesses=saved.guesses||[]; gameOver=saved.gameOver||false; won=saved.won||false;
-    // If the game was already finished (e.g. won, then page reloaded),
-    // make sure the result is counted. recordStat() is idempotent, so
-    // this won't double-count if the win was already tallied.
+    // recordStat is idempotent — safe to re-call on restore.
     if (gameOver) recordStat(won);
   } else { guesses=[]; gameOver=false; won=false; }
 
-  const s=load(SK.streak)||{streak:0};
-  document.getElementById("streak-count").textContent=`${s.streak||0} day streak`;
+  updateStreakBadge();
   renderGame(); startCountdown();
 }
+function updateStreakBadge() {
+  const s=load(SK.streak(activeGameId))||{streak:0};
+  document.getElementById("streak-count").textContent=`${s.streak||0} day streak`;
+}
 function persistGame() {
-  save(SK.game,{key:todayKey(),charName:todayChar?.name,guesses,gameOver,won});
+  save(SK.game(activeGameId),{
+    key:todayKey(), charName:todayChar?.name, guesses, gameOver, won
+  });
 }
 
 /* ─── SCORE GUESS ─── */
 function scoreGuess(guessChar) {
-  const opts=getOpts();
-  return CATS.map(cat=>({
-    label:cat.label, value:guessChar[cat.key]||"–",
-    status:scoreCategory(cat.key,guessChar[cat.key],todayChar[cat.key],opts),
+  return activeCats().map(cat=>({
+    key:cat.key, label:cat.label,
+    value:guessChar[cat.key]||"–",
+    status:scoreCategory(cat.key,guessChar[cat.key],todayChar[cat.key]),
   }));
 }
 
@@ -639,16 +750,20 @@ function scoreGuess(guessChar) {
 function renderGame() {
   const container=document.getElementById("guesses");
   container.innerHTML="";
-  guesses.forEach(g=>container.appendChild(buildRow(g)));
-  document.getElementById("attempt-num").textContent=Math.min(guesses.length+1,MAX_ATT);
+  const colCount=activeCats().length;
+  const tmpl=`130px repeat(${colCount},1fr)`;
+  guesses.forEach(g=>container.appendChild(buildRow(g,tmpl)));
+  document.getElementById("attempt-num").textContent=Math.min(guesses.length+1,maxAttempts());
+  document.getElementById("result-banner").classList.remove("show");
   if (gameOver) {
     document.getElementById("btn-submit").disabled=true;
     document.getElementById("guess-input").disabled=true;
     showBanner();
   }
 }
-function buildRow(g) {
+function buildRow(g,tmpl) {
   const row=document.createElement("div"); row.className="guess-row";
+  row.style.gridTemplateColumns=tmpl;
   const nc=document.createElement("div"); nc.className="guess-name-cell";
   nc.innerHTML=`<span>${g.name}</span>`; row.appendChild(nc);
   g.cats.forEach((cat,i)=>{
@@ -666,7 +781,8 @@ function showBanner() {
   document.getElementById("result-body").innerHTML=won
     ? `You guessed <span class="answer-reveal">${todayChar.name}</span> in ${guesses.length} attempt${guesses.length===1?"":"s"}!`
     : `The answer was <span class="answer-reveal">${todayChar.name}</span>. Better luck tomorrow!`;
-  document.getElementById("next-time-text").textContent="A new character will appear tomorrow!";
+  document.getElementById("next-time-text").textContent=
+    `A new ${game().name} character will appear tomorrow!`;
   const actions=document.getElementById("banner-actions");
   actions.innerHTML="";
   if (won) {
@@ -682,7 +798,7 @@ function showBanner() {
 /* ─── SUBMIT ─── */
 function submitGuess(name) {
   if (gameOver || !todayChar) return;
-  const chars=getChars();
+  const chars=game().characters;
   const found=chars.find(c=>c.name.toLowerCase()===name.toLowerCase());
   if (!found) { shakeInput(); toast("Character not in roster"); return; }
   if (guesses.some(g=>g.name.toLowerCase()===name.toLowerCase())) {
@@ -691,7 +807,7 @@ function submitGuess(name) {
   const cats=scoreGuess(found);
   guesses.push({name:found.name,cats});
   if (cats.every(c=>c.status==="correct")) { won=true; gameOver=true; bumpStreak(); recordStat(true); }
-  else if (guesses.length>=MAX_ATT)        { gameOver=true; recordStat(false); }
+  else if (guesses.length>=maxAttempts())  { gameOver=true; recordStat(false); }
   persistGame();
   document.getElementById("guess-input").value="";
   closeAC(); renderGame();
@@ -699,27 +815,25 @@ function submitGuess(name) {
 }
 function bumpStreak() {
   const tKey=todayKey();
-  let s=load(SK.streak)||{streak:0,last:""};
+  let s=load(SK.streak(activeGameId))||{streak:0,last:""};
   if (s.last===tKey) return;
   s.streak=s.last===yesterdayKey()?(s.streak||0)+1:1;
-  s.last=tKey; save(SK.streak,s);
-  document.getElementById("streak-count").textContent=`${s.streak} day streak`;
+  s.last=tKey; save(SK.streak(activeGameId),s);
+  updateStreakBadge();
 }
 
-/* ─── STATS TRACKING ─── */
-/* recordStat is idempotent: it records at most once per UTC day.
-   `countedDays` remembers which days were already tallied, so it's
-   safe to call this both on the winning guess AND on page restore. */
+/* ─── STATS TRACKING (per game) ─── */
+/* recordStat is idempotent: records at most once per UTC day per game. */
 function recordStat(didWin) {
-  let st=load(SK.stats)||{plays:0,wins:0,best:0,countedDays:[]};
+  let st=load(SK.stats(activeGameId))||{plays:0,wins:0,best:0,countedDays:[]};
   if (!st.countedDays) st.countedDays=[];
   const tKey=todayKey();
   if (st.countedDays.includes(tKey)) return;   // already counted today
   st.countedDays.push(tKey);
   st.plays++; if (didWin) st.wins++;
-  const cur=(load(SK.streak)||{streak:0}).streak||0;
+  const cur=(load(SK.streak(activeGameId))||{streak:0}).streak||0;
   if (cur>st.best) st.best=cur;
-  save(SK.stats,st);
+  save(SK.stats(activeGameId),st);
 }
 function getColorGrid() {
   // returns the per-guess color matrix for the share grid
@@ -732,7 +846,7 @@ function openAC(val) {
   const box=document.getElementById("autocomplete");
   const q=val.trim().toLowerCase();
   if (!q) { closeAC(); return; }
-  const hits=getChars().filter(c=>
+  const hits=game().characters.filter(c=>
     c.name.toLowerCase().includes(q) && !guesses.some(g=>g.name.toLowerCase()===c.name.toLowerCase())
   ).slice(0,8);
   if (!hits.length) { closeAC(); return; }
@@ -756,17 +870,6 @@ function navAC(dir) {
   items[acIdx].classList.add("ac-active");
   document.getElementById("guess-input").value=items[acIdx].dataset.name;
 }
-document.getElementById("guess-input").addEventListener("input",e=>openAC(e.target.value));
-document.getElementById("guess-input").addEventListener("keydown",e=>{
-  if(e.key==="ArrowDown"){e.preventDefault();navAC(1)}
-  if(e.key==="ArrowUp")  {e.preventDefault();navAC(-1)}
-  if(e.key==="Enter")    {submitGuess(document.getElementById("guess-input").value.trim())}
-  if(e.key==="Escape")   {closeAC()}
-});
-document.addEventListener("click",e=>{if(!e.target.closest(".input-wrap"))closeAC()});
-document.getElementById("btn-submit").addEventListener("click",()=>
-  submitGuess(document.getElementById("guess-input").value.trim())
-);
 
 /* ─── COUNTDOWN ─── */
 function startCountdown() {
@@ -780,274 +883,34 @@ function startCountdown() {
   tick(); if(!window.__cdTimer) window.__cdTimer=setInterval(tick,1000);
 }
 
-/* ─── VIEW SWITCHING ─── */
-function openAdminPanel() {
-  document.getElementById("view-game").classList.remove("active");
-  document.getElementById("view-admin").classList.add("active");
-  renderAdmin();
-}
-function showAdmin() {
-  // Already unlocked before? Go straight in.
-  if (localStorage.getItem("cg_manage_unlocked")==="yes") {
-    openAdminPanel();
-    return;
-  }
-  // Otherwise show the password modal (prompt() is blocked in Discord).
-  const inp=document.getElementById("pw-input");
-  if (inp) inp.value="";
-  document.getElementById("pw-modal").classList.add("show");
-  if (inp) setTimeout(()=>inp.focus(),50);
-}
-function checkPassword() {
-  const inp=document.getElementById("pw-input");
-  const entered=inp ? inp.value : "";
-  if (entered===MANAGE_PASSWORD) {
-    localStorage.setItem("cg_manage_unlocked","yes");
-    closeModal("pw-modal");
-    toast("✓ Manage unlocked");
-    openAdminPanel();
-  } else {
-    toast("🔒 Incorrect password");
-  }
-}
-function showGame() {
-  document.getElementById("view-admin").classList.remove("active");
-  document.getElementById("view-game").classList.add("active");
-  initGame();
-}
-function switchTab(name) {
-  const order=["characters","options","suggestions"];
-  document.querySelectorAll(".tab-btn").forEach((b,i)=>b.classList.toggle("active",order[i]===name));
-  document.getElementById("tab-characters").classList.toggle("active",name==="characters");
-  document.getElementById("tab-options").classList.toggle("active",name==="options");
-  document.getElementById("tab-suggestions").classList.toggle("active",name==="suggestions");
-  if (name==="suggestions") renderSuggestionList();
-}
-
-/* ─── ADMIN RENDER ─── */
-function renderAdmin() {
-  const opts=getOpts();
-  populateDropdowns(opts); renderCharList(); renderOptionsPanel(opts); renderSuggestionList();
-}
-function allRoles(opts)    { return Object.values(opts.roleSimilarGroups).flat(); }
-function allElements(opts) { return opts.elementGroups.flatMap(g=>Array.isArray(g)?g:[g]); }
-function populateDropdowns(opts) {
-  fill("f-game",        opts.games.length?opts.games:["(add games in Categories tab)"]);
-  fill("f-affiliation", opts.affiliations);
-  fill("f-role",        allRoles(opts));
-  fill("f-rarity",      opts.rarities);
-  fill("f-element",     allElements(opts));
-}
-function fill(id,arr) {
-  const sel=document.getElementById(id); if(!sel)return;
-  const cur=sel.value;
-  sel.innerHTML=arr.map(v=>`<option value="${v}">${v}</option>`).join("");
-  if(arr.includes(cur)) sel.value=cur;
-}
-function renderCharList() {
-  const chars=getChars(), list=document.getElementById("char-list");
-  if(!chars.length){
-    list.innerHTML=`<div style="font-size:0.8rem;color:var(--sub);text-align:center;padding:20px 0;">No characters yet — add one above!</div>`;
-    return;
-  }
-  list.innerHTML=chars.map((c,i)=>`
-    <div class="char-card">
-      <div class="char-card-info">
-        <div class="char-card-name">${c.name}</div>
-        <div class="char-card-tags">
-          <span class="tag">${c.game}</span><span class="tag">${c.affiliation}</span>
-          <span class="tag">${c.role}</span><span class="tag">${c.rarity}</span>
-          <span class="tag">${c.element}</span>
-        </div>
-      </div>
-      <button class="btn-del" data-del-char="${i}">Remove</button>
-    </div>`).join("");
-}
-function addCharacter() {
-  const name=document.getElementById("f-name").value.trim();
-  if(!name){toast("Enter a character name");return}
-  const chars=getChars();
-  if(chars.some(c=>c.name.toLowerCase()===name.toLowerCase())){toast("Already exists");return}
-  chars.push({
-    name,
-    game:document.getElementById("f-game").value,
-    affiliation:document.getElementById("f-affiliation").value,
-    role:document.getElementById("f-role").value,
-    rarity:document.getElementById("f-rarity").value,
-    element:document.getElementById("f-element").value,
-  });
-  saveChars(chars);
-  document.getElementById("f-name").value="";
-  toast(`✓ ${name} added`); renderCharList();
-}
-function deleteChar(i) {
-  const chars=getChars(), name=chars[i]?.name;
-  chars.splice(i,1); saveChars(chars); toast(`${name} removed`); renderCharList();
-}
-
-/* ─── OPTIONS PANEL ─── */
-function renderOptionsPanel(opts) {
-  const grid=document.getElementById("options-grid"); grid.innerHTML="";
-  grid.appendChild(makeSimpleBlock("Games",opts.games,
-    v=>{opts.games.push(v);saveOpts(opts);renderAdmin()},
-    i=>{opts.games.splice(i,1);saveOpts(opts);renderAdmin()},"e.g. Epic Seven"));
-  grid.appendChild(makeSimpleBlock("Affiliations",opts.affiliations,
-    v=>{opts.affiliations.push(v);saveOpts(opts);renderAdmin()},
-    i=>{opts.affiliations.splice(i,1);saveOpts(opts);renderAdmin()},"e.g. Anti-Hero"));
-  grid.appendChild(makeSimpleBlock("Rarities (low → high)",opts.rarities,
-    v=>{opts.rarities.push(v);saveOpts(opts);renderAdmin()},
-    i=>{opts.rarities.splice(i,1);saveOpts(opts);renderAdmin()},"e.g. Mythic"));
-  grid.appendChild(makeElementBlock(opts));
-  const rb=makeRoleBlock(opts); rb.style.gridColumn="1/-1"; grid.appendChild(rb);
-}
-function makeSimpleBlock(title,items,onAdd,onRemove,ph) {
-  const slug=title.replace(/\W+/g,"-").toLowerCase();
-  const div=document.createElement("div"); div.className="options-block";
-  const render=()=>{
-    const wrap=div.querySelector(".option-tags");
-    wrap.innerHTML=items.map((v,i)=>`<span class="option-tag">${v}<span class="rm" data-i="${i}">✕</span></span>`).join("");
-    wrap.querySelectorAll(".rm").forEach(el=>el.addEventListener("click",()=>onRemove(+el.dataset.i)));
-  };
-  div.innerHTML=`<div class="options-block-title">${title}</div>
-    <div class="option-tags"></div>
-    <div class="add-option-row">
-      <input type="text" placeholder="${ph}" id="oi-${slug}"/>
-      <button class="btn-add-opt" id="ob-${slug}">+</button>
-    </div>`;
-  render();
-  div.querySelector(`#ob-${slug}`).addEventListener("click",()=>{
-    const inp=div.querySelector(`#oi-${slug}`), v=inp.value.trim();
-    if(!v||items.includes(v)){toast("Already exists or empty");return}
-    inp.value=""; onAdd(v);
-  });
-  div.querySelector(`#oi-${slug}`).addEventListener("keydown",e=>{
-    if(e.key==="Enter")div.querySelector(`#ob-${slug}`).click();
-  });
-  return div;
-}
-function makeRoleBlock(opts) {
-  const div=document.createElement("div"); div.className="options-block";
-  function render() {
-    div.innerHTML=`<div class="options-block-title">Role / Class Types
-      <span style="font-size:0.62rem;color:var(--sub);font-weight:400;text-transform:none;margin-left:6px;">Same type = similar</span></div>`;
-    for(const [typeName,classes] of Object.entries(opts.roleSimilarGroups)) {
-      const block=document.createElement("div"); block.className="role-type-block";
-      block.innerHTML=`<div class="option-group-label">${typeName}
-        <span class="rm" data-type="${typeName}" style="cursor:pointer;color:var(--muted);margin-left:6px;font-size:0.7rem;">(remove type)</span></div>
-        <div class="option-tags">
-        ${classes.map((v,i)=>`<span class="option-tag">${v}<span class="rm" data-type="${typeName}" data-i="${i}">✕</span></span>`).join("")}
-        </div>
-        <div class="add-option-row" style="margin-bottom:10px;">
-        <input type="text" placeholder="Add class to ${typeName}…" class="cls-inp" data-type="${typeName}"/>
-        <button class="btn-add-opt cls-btn" data-type="${typeName}">+</button></div>`;
-      div.appendChild(block);
-    }
-    const addType=document.createElement("div");
-    addType.innerHTML=`<div class="option-group-label" style="margin-top:8px;">Add new type</div>
-      <div class="add-option-row">
-        <input type="text" placeholder="Type name (e.g. Magic)" id="new-type-inp"/>
-        <button class="btn-add-opt" id="new-type-btn">+ Type</button></div>`;
-    div.appendChild(addType);
-    div.querySelectorAll(".rm[data-type]").forEach(el=>el.addEventListener("click",()=>{
-      const t=el.dataset.type;
-      if(el.dataset.i!==undefined)opts.roleSimilarGroups[t].splice(+el.dataset.i,1);
-      else delete opts.roleSimilarGroups[t];
-      saveOpts(opts); render();
-    }));
-    div.querySelectorAll(".cls-btn").forEach(btn=>btn.addEventListener("click",()=>{
-      const t=btn.dataset.type, inp=div.querySelector(`.cls-inp[data-type="${t}"]`), v=inp.value.trim();
-      if(!v)return; opts.roleSimilarGroups[t].push(v); inp.value=""; saveOpts(opts); render();
-    }));
-    div.querySelectorAll(".cls-inp").forEach(inp=>inp.addEventListener("keydown",e=>{
-      if(e.key==="Enter")div.querySelector(`.cls-btn[data-type="${inp.dataset.type}"]`).click();
-    }));
-    div.querySelector("#new-type-btn")?.addEventListener("click",()=>{
-      const inp=div.querySelector("#new-type-inp"), v=inp.value.trim();
-      if(!v||opts.roleSimilarGroups[v]){toast("Already exists or empty");return}
-      opts.roleSimilarGroups[v]=[]; inp.value=""; saveOpts(opts); render();
-    });
-  }
-  render(); return div;
-}
-function makeElementBlock(opts) {
-  const div=document.createElement("div"); div.className="options-block";
-  function render() {
-    div.innerHTML=`<div class="options-block-title">Elements
-      <span style="font-size:0.62rem;color:var(--sub);font-weight:400;text-transform:none;margin-left:6px;">Same row = similar</span></div>`;
-    opts.elementGroups.forEach((grp,gi)=>{
-      const items=Array.isArray(grp)?grp:[grp];
-      const block=document.createElement("div"); block.className="role-type-block";
-      block.innerHTML=`<div class="option-group-label">Group ${gi+1}
-        <span class="rm" data-gi="${gi}" style="cursor:pointer;color:var(--muted);margin-left:6px;font-size:0.7rem;">(remove)</span></div>
-        <div class="option-tags">
-        ${items.map((v,i)=>`<span class="option-tag">${v}<span class="rm" data-gi="${gi}" data-i="${i}">✕</span></span>`).join("")}
-        </div>
-        <div class="add-option-row" style="margin-bottom:8px;">
-        <input type="text" placeholder="Add to group ${gi+1}…" class="el-inp" data-gi="${gi}"/>
-        <button class="btn-add-opt el-btn" data-gi="${gi}">+</button></div>`;
-      div.appendChild(block);
-    });
-    const addEl=document.createElement("div");
-    addEl.innerHTML=`<div class="option-group-label" style="margin-top:8px;">New standalone element</div>
-      <div class="add-option-row">
-        <input type="text" placeholder="e.g. Arcane" id="new-el-inp"/>
-        <button class="btn-add-opt" id="new-el-btn">+ Add</button></div>`;
-    div.appendChild(addEl);
-    div.querySelectorAll(".rm[data-gi]").forEach(el=>el.addEventListener("click",()=>{
-      const gi=+el.dataset.gi;
-      if(el.dataset.i!==undefined){
-        const grp=opts.elementGroups[gi];
-        if(Array.isArray(grp)){grp.splice(+el.dataset.i,1);
-          if(grp.length===1)opts.elementGroups[gi]=grp[0];
-          if(grp.length===0)opts.elementGroups.splice(gi,1);
-        } else opts.elementGroups.splice(gi,1);
-      } else opts.elementGroups.splice(gi,1);
-      saveOpts(opts); render();
-    }));
-    div.querySelectorAll(".el-btn").forEach(btn=>btn.addEventListener("click",()=>{
-      const gi=+btn.dataset.gi, inp=div.querySelector(`.el-inp[data-gi="${gi}"]`), v=inp.value.trim();
-      if(!v)return;
-      const grp=opts.elementGroups[gi];
-      opts.elementGroups[gi]=Array.isArray(grp)?[...grp,v]:[grp,v];
-      inp.value=""; saveOpts(opts); render();
-    }));
-    div.querySelectorAll(".el-inp").forEach(inp=>inp.addEventListener("keydown",e=>{
-      if(e.key==="Enter")div.querySelector(`.el-btn[data-gi="${inp.dataset.gi}"]`).click();
-    }));
-    div.querySelector("#new-el-btn")?.addEventListener("click",()=>{
-      const inp=div.querySelector("#new-el-inp"), v=inp.value.trim();
-      if(!v){toast("Enter an element name");return}
-      opts.elementGroups.push(v); inp.value=""; saveOpts(opts); render();
-    });
-  }
-  render(); return div;
-}
-
 /* ═══════════════════════════════════════════════════════
    SUGGESTIONS
+   A player may suggest ONE character per day PER GAME,
+   only after winning that game that day.
    ═══════════════════════════════════════════════════ */
-function getSuggestions()    { return load(SK.suggest)||[]; }
-function saveSuggestions(s)  { save(SK.suggest,s); }
+function getSuggestions()   { return load(SK.suggest)||[]; }
+function saveSuggestions(s) { save(SK.suggest,s); }
 
 function openSuggest() {
   const body=document.getElementById("suggest-body");
-  // Rule: a player may only suggest if they won today
+  // Rule: a player may only suggest if they won this game today
   if (!won) {
     body.innerHTML=`
       <div class="sug-locked">
-        🔒 Suggestions unlock after you <strong>win today's puzzle</strong>.
+        🔒 Suggestions unlock after you <strong>win today's ${game().name} puzzle</strong>.
         Come back once you've guessed the character!
       </div>`;
     document.getElementById("suggest-modal").classList.add("show");
     return;
   }
-  // Already suggested today?
+  // Already suggested today for this game?
   const tKey=todayKey();
-  const mine=getSuggestions().find(s=>s.day===tKey && s.userId===(currentUserId||"local"));
+  const mine=getSuggestions().find(s=>
+    s.day===tKey && s.gameId===activeGameId && s.userId===(currentUserId||"local"));
   if (mine) {
     body.innerHTML=`
       <div class="sug-locked">
-        ✅ You've already suggested <strong>${mine.name}</strong> today.
+        ✅ You've already suggested <strong>${mine.name}</strong> for ${game().name} today.
         Thanks! You can suggest again after tomorrow's win.
       </div>`;
     document.getElementById("suggest-modal").classList.add("show");
@@ -1055,8 +918,8 @@ function openSuggest() {
   }
   body.innerHTML=`
     <div class="sug-note">
-      Nice win! 🎉 You've earned a suggestion. Propose a character for the
-      manager to add to the pool. One suggestion per winning day.
+      Nice win! 🎉 You've earned a suggestion for <strong>${game().name}</strong>.
+      Propose a character for the manager to add. One per winning day per game.
     </div>
     <div class="form-grid">
       <div class="form-field form-full">
@@ -1064,12 +927,8 @@ function openSuggest() {
         <input type="text" id="sug-name" placeholder="Character name"/>
       </div>
       <div class="form-field form-full">
-        <label>Game / Franchise</label>
-        <input type="text" id="sug-game" placeholder="Which game are they from?"/>
-      </div>
-      <div class="form-field form-full">
         <label>Note for the manager (optional)</label>
-        <input type="text" id="sug-note-inp" placeholder="Rarity, element, why they'd fit…"/>
+        <input type="text" id="sug-note-inp" placeholder="Rarity, arch, element, why they'd fit…"/>
       </div>
     </div>
     <button class="btn-add-char" id="btn-submit-suggestion">Submit Suggestion</button>`;
@@ -1079,12 +938,13 @@ function openSuggest() {
 }
 function submitSuggestion() {
   const name=document.getElementById("sug-name").value.trim();
-  const game=document.getElementById("sug-game").value.trim();
   const note=document.getElementById("sug-note-inp").value.trim();
   if (!name) { toast("Enter a character name"); return; }
   const list=getSuggestions();
   list.push({
-    name, game, note,
+    name, note,
+    gameId:activeGameId,
+    gameName:game().name,
     day:todayKey(),
     userId:currentUserId||"local",
     userName:currentUserName||"Anonymous",
@@ -1094,38 +954,19 @@ function submitSuggestion() {
   closeModal("suggest-modal");
   toast("💡 Suggestion sent — thank you!");
 }
-function renderSuggestionList() {
-  const list=document.getElementById("suggestion-list");
-  if (!list) return;
-  const items=getSuggestions().slice().reverse();
-  if (!items.length) {
-    list.innerHTML=`<div style="font-size:0.8rem;color:var(--sub);text-align:center;padding:20px 0;">No suggestions yet.</div>`;
-    return;
-  }
-  list.innerHTML=items.map((s,ri)=>{
-    const idx=getSuggestions().length-1-ri;
-    return `<div class="suggestion-card">
-      <div class="s-info">
-        <div class="s-name">${s.name}</div>
-        <div class="s-meta">${s.game?s.game+" · ":""}by ${s.userName}${s.note?' · "'+s.note+'"':""}</div>
-      </div>
-      <button class="btn-del" data-del-suggestion="${idx}">Dismiss</button>
-    </div>`;
-  }).join("");
-}
-function deleteSuggestion(i) {
-  const list=getSuggestions(); list.splice(i,1); saveSuggestions(list); renderSuggestionList();
-}
 
 /* ═══════════════════════════════════════════════════════
-   STATS MODAL
+   STATS MODAL (per active game)
    ═══════════════════════════════════════════════════ */
 function openStats() {
   renderStatsModal();
   document.getElementById("stats-modal").classList.add("show");
 }
 function renderStatsModal() {
-  // Players who played today, including this user
+  document.getElementById("stats-title").textContent=`${game().name} — Today's Players`;
+  document.getElementById("sg-title").textContent=`Your ${game().name} Statistics`;
+
+  const colCount=activeCats().length;
   const players=getTodayPlayers();
   const wrap=document.getElementById("stats-players");
   if (!players.length) {
@@ -1135,8 +976,8 @@ function renderStatsModal() {
       const name=p.name||"Player";
       const grid=Array.isArray(p.grid)?p.grid:[];
       const cells=[];
-      for (let r=0;r<MAX_ATT;r++){
-        for (let c=0;c<5;c++){
+      for (let r=0;r<maxAttempts();r++){
+        for (let c=0;c<colCount;c++){
           const status=(grid[r]&&grid[r][c])||"empty";
           cells.push(`<div class="spc-cell ${status}"></div>`);
         }
@@ -1146,14 +987,14 @@ function renderStatsModal() {
           ? `<img src="${p.avatar}" style="width:100%;height:100%;border-radius:50%;object-fit:cover"/>`
           : (name.charAt(0).toUpperCase()||"?")}</div>
         <div class="spc-name">${name}</div>
-        <div class="spc-grid" style="grid-template-columns:repeat(5,1fr)">${cells.join("")}</div>
+        <div class="spc-grid" style="grid-template-columns:repeat(${colCount},1fr)">${cells.join("")}</div>
       </div>`;
     }).join("");
   }
-  // general stats (this user)
-  const st=load(SK.stats)||{plays:0,wins:0,best:0};
+  // general stats (this user, this game)
+  const st=load(SK.stats(activeGameId))||{plays:0,wins:0,best:0};
   const rate=st.plays?Math.round((st.wins/st.plays)*100):0;
-  const cur=(load(SK.streak)||{streak:0}).streak||0;
+  const cur=(load(SK.streak(activeGameId))||{streak:0}).streak||0;
   document.getElementById("sg-winrate").textContent=rate+"%";
   document.getElementById("sg-current").textContent=cur;
   document.getElementById("sg-best").textContent=Math.max(st.best||0,cur);
@@ -1161,13 +1002,11 @@ function renderStatsModal() {
 /* Build today's player list from presence data + own progress */
 function getTodayPlayers() {
   const list=[];
-  // self — always shown
   list.push({
     name:(currentUserName||"You")+" (you)",
     avatar:currentUserAvatar,
     grid:getColorGrid(),
   });
-  // others currently in the activity
   presencePlayers.forEach(p=>{
     if (p.userId && p.userId===currentUserId) return;  // skip self
     list.push({ name:p.name||"Player", avatar:p.avatar, grid:p.grid||[] });
@@ -1197,10 +1036,13 @@ function toast(msg) {
    DISCORD SDK — presence & identity
    ─────────────────────────────────────────────────────
    • DISCORD_CLIENT_ID → your Discord app Client ID
-   • MANAGE_PASSWORD   → password to unlock the Manage panel
+   • NOTE: authorize() is intentionally NOT called. It was
+     prompting the user every time the activity opened. We
+     read identity from whatever the SDK exposes without
+     triggering a consent popup. If a field is missing the
+     game still works — it just shows "You" in presence.
    ═══════════════════════════════════════════════════ */
 const DISCORD_CLIENT_ID = "1505740299220029662";
-const MANAGE_PASSWORD   = "JesusIsLord0590";
 
 let discordSdk        = null;
 let currentUserId     = null;
@@ -1214,26 +1056,8 @@ let presencePlayers   = [];   // [{userId,name,avatar,grid}]
     discordSdk=new DiscordSDK(DISCORD_CLIENT_ID);
     await discordSdk.ready();
 
-    /* AUTHORIZE — only request "identify".
-       Discord remembers consent per user, so after the FIRST
-       approval this resolves silently and shows no popup.
-       Asking for fewer scopes = fewer re-prompts. */
-    let code=null;
-    try {
-      const res=await discordSdk.commands.authorize({
-        client_id:DISCORD_CLIENT_ID,
-        response_type:"code",
-        state:"",
-        prompt:"none",          // suppress consent screen after first time
-        scope:["identify"],
-      });
-      code=res?.code||null;
-    } catch(authErr){
-      console.warn("authorize() declined or failed",authErr);
-    }
-
     /* Identify the local user — try several SDK fields.
-       None of these need a backend. */
+       None of these need authorize() or a backend. */
     function adopt(u){
       if(!u||!u.id) return false;
       currentUserId=u.id;
@@ -1242,7 +1066,7 @@ let presencePlayers   = [];   // [{userId,name,avatar,grid}]
         currentUserAvatar=`https://cdn.discordapp.com/avatars/${u.id}/${u.avatar}.png?size=64`;
       return true;
     }
-    // 1) participant list (works without backend)
+    // 1) participant list (works without backend / authorize)
     try {
       const r=await discordSdk.commands.getInstanceConnectedParticipants();
       const parts=r?.participants||[];
@@ -1265,8 +1089,6 @@ let presencePlayers   = [];   // [{userId,name,avatar,grid}]
     console.warn("Running outside Discord — standalone mode",e);
     renderPresence();
   }
-  // Manage button is always visible (password-gated on click)
-  document.getElementById("btn-admin").style.display="";
 })();
 
 /* Pull the live list of people in this activity instance */
@@ -1294,18 +1116,13 @@ function renderPresence() {
   const listEl=document.getElementById("presence-list");
   const countEl=document.getElementById("presence-count");
 
-  // Build the displayed roster: everyone in the instance.
   let roster=presencePlayers.slice();
-  // make sure the current user is always included
   if (currentUserId && !roster.some(p=>p.userId===currentUserId)) {
     roster.unshift({userId:currentUserId,name:currentUserName||"You",avatar:currentUserAvatar});
   }
-  // if SDK gave us nothing at all but we have a name, show ourselves
   if (!roster.length && currentUserName) {
     roster=[{userId:"local",name:currentUserName,avatar:currentUserAvatar}];
   }
-  // last resort: if we're clearly inside Discord but identity failed,
-  // still show a "You" entry so the panel isn't empty
   if (!roster.length && discordSdk) {
     roster=[{userId:"local",name:"You",avatar:null}];
   }
@@ -1331,28 +1148,23 @@ function renderPresence() {
 
 /* ═══════════════════════════════════════════════════════
    PUBLISH PRESENCE TO THE CHANNEL
-   Updates the activity so Discord shows the
-   "X was playing / X and Y were playing" message
-   with the proper grid preview (images 2 & 3).
+   "X was playing / X and Y were playing" in chat.
    ═══════════════════════════════════════════════════ */
 function publishPresence() {
   if (!discordSdk) return;
   try {
-    // The list of names currently in the activity
     const names=(presencePlayers.length?presencePlayers:[{name:currentUserName}])
       .map(p=>p.name).filter(Boolean);
 
-    // Format: "A was playing" / "A and B were playing" / "A, B and C were playing"
     let phrase;
     if (names.length<=1)        phrase=`${names[0]||"Someone"} was playing`;
     else if (names.length===2)  phrase=`${names[0]} and ${names[1]} were playing`;
     else phrase=`${names.slice(0,-1).join(", ")} and ${names[names.length-1]} were playing`;
 
-    // setActivity drives the rich-presence card shown in chat
     discordSdk.commands.setActivity?.({
       activity:{
         type:0,
-        details:"Cookie Guess",
+        details:`Cookie Guess — ${game().name}`,
         state:phrase,
         assets:{
           large_image:"cookie_guess_logo",
@@ -1375,37 +1187,25 @@ function bindUI() {
   const bind=(id,fn)=>{ const el=document.getElementById(id); if(el) el.addEventListener("click",fn); };
 
   // header buttons
-  bind("btn-stats",     openStats);
-  bind("btn-suggest",   openSuggest);
-  bind("btn-admin",     showAdmin);
-  bind("pw-unlock-btn", checkPassword);
+  bind("btn-stats",   openStats);
+  bind("btn-suggest", openSuggest);
 
-  // manage panel buttons
-  bind("btn-back-game", showGame);
-  bind("btn-add-char",  addCharacter);
-
-  // manage tab switcher (data-tab attribute)
-  document.querySelectorAll(".tab-btn").forEach(btn=>{
-    btn.addEventListener("click",()=>switchTab(btn.dataset.tab));
+  // guess input
+  const gi=document.getElementById("guess-input");
+  gi.addEventListener("input",e=>openAC(e.target.value));
+  gi.addEventListener("keydown",e=>{
+    if(e.key==="ArrowDown"){e.preventDefault();navAC(1)}
+    if(e.key==="ArrowUp")  {e.preventDefault();navAC(-1)}
+    if(e.key==="Enter")    {submitGuess(gi.value.trim())}
+    if(e.key==="Escape")   {closeAC()}
   });
-
-  // password input: Enter submits
-  const pw=document.getElementById("pw-input");
-  if (pw) pw.addEventListener("keydown",e=>{ if(e.key==="Enter") checkPassword(); });
-
-  /* EVENT DELEGATION for dynamically-created buttons
-     (Remove character, Dismiss suggestion, all the option +/✕
-     buttons inside the Categories tab). These elements are
-     rebuilt on every render, so we listen on a stable parent. */
-  document.body.addEventListener("click",e=>{
-    const t=e.target;
-    if (t.dataset && t.dataset.delChar!==undefined)       deleteChar(+t.dataset.delChar);
-    if (t.dataset && t.dataset.delSuggestion!==undefined) deleteSuggestion(+t.dataset.delSuggestion);
-  });
+  document.addEventListener("click",e=>{if(!e.target.closest(".input-wrap"))closeAC()});
+  bind("btn-submit",()=>submitGuess(gi.value.trim()));
 }
 
 /* ─── BOOT ─── */
 bindUI();
+renderGameTabs();
 initGame();
 renderPresence();
 </script>
