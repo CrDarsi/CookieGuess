@@ -34,8 +34,8 @@
   • Arc · Affiliation · Role · Rarity · Element
   • The old "Game" category is GONE (each puzzle is one game already).
   • "Arc" is the per-game story-arc category (placeholder list per game).
-  • OVENBREAK is special: it has NO Element category → only 4
-    categories AND only 4 attempts. The other two games: 5 + 5.
+  • OVENBREAK now uses the full 5 categories (Element = action/non-action,
+    Arc = release year, Role = hashtag tags). 5 attempts like the others.
 
   ── ALL CATEGORIES ARE PER-GAME ───────────────────────────────────────
   • Every game in GAME_DATA owns its OWN complete set of all 5
@@ -57,9 +57,12 @@
 
   ── COLOR RULES ───────────────────────────────────────────────────────
   • correct = the guess's value-set exactly matches the answer's (green)
-  • close   = sets overlap (share a value) but aren't identical, OR a
-              shared Role/Element similarity group (yellow)
+  • close   = sets overlap (share at least one value) but aren't
+              identical (yellow)
   • wrong   = nothing shared (red)
+  • Similarity groups (roleSimilarGroups, elementGroups) are configured
+    per game but NOT currently used by scoring — only direct value
+    overlap counts. They can be re-enabled later if you want them.
   • Fields can be single values or arrays (multi-value) — see the
     MULTI-VALUE FIELDS note in the GAME_DATA block below.
 
@@ -116,6 +119,7 @@
       /* accent (neutral light gray for primary actions) */
       --accent:#6b6b72;--accent-hover:#7d7d85;
       --radius:4px;--font-head:'Bebas Neue',sans-serif;--font-body:'DM Sans',sans-serif;
+      --char-col:130px;
     }
     *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
     html,body{height:100%;background:var(--bg);color:var(--text);font-family:var(--font-body)}
@@ -268,7 +272,44 @@
     .cat-cell.correct{background:var(--correct-bg);border-color:var(--correct-border);color:var(--correct)}
     .cat-cell.close{background:var(--close-bg);border-color:var(--close-border);color:var(--close)}
     .cat-cell.wrong{background:var(--wrong-bg);border-color:var(--wrong-border);color:var(--sub)}
+    /* ── OVENBREAK ROLE PILLS ──
+       When Ovenbreak's role cell renders multi-tag matching, each
+       hashtag becomes a pill: green outline if the tag IS in the
+       answer's tag set, red outline if not. The cell's own
+       border/background already shows the set-level result; pills
+       add the per-tag detail. Pill text is black so it stays readable
+       against the bright outline colors. */
+    .cat-cell.role-pill-cell{padding:5px 3px}
+    .cat-cell.role-pill-cell .role-pills{display:flex;flex-wrap:wrap;gap:3px;
+      justify-content:center;align-items:center}
+    .cat-cell.role-pill-cell .role-pill{
+      display:inline-block;font-size:0.58rem;font-weight:700;
+      padding:2px 6px;border-radius:10px;line-height:1.2;
+      background:#f5f5f0;color:#111;border:1.5px solid transparent}
+    .cat-cell.role-pill-cell .role-pill.hit{border-color:var(--correct);
+      box-shadow:0 0 0 1px var(--correct) inset}
+    .cat-cell.role-pill-cell .role-pill.miss{border-color:var(--wrong);
+      box-shadow:0 0 0 1px var(--wrong) inset}
     @keyframes flipIn{from{opacity:0;transform:rotateX(-55deg) scale(0.92)}to{opacity:1;transform:rotateX(0) scale(1)}}
+
+    /* ── PHONE LAYOUT (Option A) ──
+       Narrow viewports get cramped cells because 5 categories + a
+       130px name column leaves ~50px per cell. This tightens things
+       so values like "Melancholy Arc" wrap as two words instead of
+       getting chopped mid-letter ("Melan/choly/Arc"). */
+    @media(max-width:560px){
+      :root{ --char-col:78px; }                            /* tighter name col */
+      .cat-cell{padding:5px 3px;font-size:0.6rem;min-height:48px;line-height:1.25}
+      .cat-cell .cell-label{display:none}                   /* column header already shows the label */
+      .cat-cell .cell-value{
+        word-break:normal;overflow-wrap:break-word;
+        hyphens:auto;-webkit-hyphens:auto;
+      }
+      .guess-name-cell{padding:6px 7px;font-size:0.72rem;min-height:48px}
+      .guess-name-cell span{white-space:normal;text-overflow:clip;
+        line-height:1.2;word-break:break-word}
+      .cat-label{font-size:0.55rem;letter-spacing:0.4px;padding:2px 1px}
+    }
     #result-banner{display:none;width:100%;max-width:660px;background:var(--surface);
       border:1px solid var(--border);border-radius:var(--radius);padding:18px 20px;
       text-align:center;animation:rowIn .3s ease both}
@@ -468,7 +509,6 @@ window.addEventListener("error",e=>console.warn("[CookieGuess] error:",e.message
    • EVERY field must be one of THAT GAME's own category values:
      `arc`→arcs, `affiliation`→affiliations, `role`→a class inside
      roleSimilarGroups, `rarity`→rarities, `element`→elementGroups.
-   • OVENBREAK characters do NOT need an `element` (it's ignored).
 
    ── MULTI-VALUE FIELDS ──
    Any field can hold MORE THAN ONE value — write it as an array:
@@ -482,8 +522,7 @@ window.addEventListener("error",e=>console.warn("[CookieGuess] error:",e.message
      • GREEN  — the guess's values EXACTLY match the answer's full set.
                 A cookie with 2 arcs only goes green once the guess
                 shares BOTH of its arcs.
-     • YELLOW — the sets aren't identical but share at least one value
-                (for Role/Element, sharing a similarity group counts).
+     • YELLOW — the sets aren't identical but share at least one value.
      • RED    — nothing shared at all.
 
    ── PER-GAME FIELD REFERENCE ──
@@ -732,35 +771,220 @@ const GAME_DATA = {
   },
 
   /* ───────────── GAME 3 ─────────────
-     OVENBREAK: no Element category, only 4 attempts.
-     `elementGroups` is kept for reference but is ignored because
-     `hasElement` is false — you can leave it empty if you prefer. */
+     OVENBREAK: full 5 categories, 5 attempts. Mapping from the source:
+       Year         → arc   (each cookie's release year)
+       action/non-action → element
+       Good/Evil/Neutral → affiliation (Evil maps to "Villain")
+       Hashtag tags → role (multi-value; no "#" prefix in data)
+     Names drop the trailing " Cookie" so players type just the prefix. */
   ovenbreak: {
     id:"ovenbreak",
     name:"Ovenbreak",
-    hasElement:false,
-    maxAttempts:4,
+    hasElement:true,
+    maxAttempts:5,
     arcs:[
-      "Arc A (placeholder)",
-      "Arc B (placeholder)",
-      "Arc C (placeholder)",
+      "2016","2017","2018","2019","2020","2021",
+      "2022","2023","2024","2025","2026",
     ],
     affiliations:["Hero","Villain","Neutral","Side-Kick"],
+    /* Role groups are organised thematically for readability but are NOT
+       used by scoring (similarity groups are off). Every hashtag tag from
+       the source data is listed here so the validator accepts them. */
     roleSimilarGroups:{
-      "Melee":   ["Ambush","Charge","Defense","Smash","Slash"],
-      "Ranged":  ["Bomber","Magic","Ranged"],
-      "Support": ["Assist Buff","Assist Debuff","Healer","Support"],
-      "Special": ["BTS","Special Guest"],
+      "Movement":["Speed","FixedSpeed","EnergySpeed","Dash","Flight",
+        "Jump","Slide","GiantMode"],
+      "Scoring":["Score","Jellies","BearJellies","StarJellies",
+        "FlowerJelly","NoteJelly"],
+      "Defense":["Shield","Recovery","Revival","Magnetism","SuperMagnetism"],
+      "Offense":["Blast","BlastMode","LastBlast","Destruction","SpecialControl"],
+      "Special":["Coins","Items","Potions","JellyParty"],
     },
-    rarities:[
-      "Common (placeholder)",
-      "Rare (placeholder)",
-      "Epic (placeholder)",
-      "Legendary (placeholder)",
-    ],
-    elementGroups:[],   /* ignored — Ovenbreak has no Element category */
+    rarities:["Common","Rare","Epic","Legendary"],
+    elementGroups:["action","non-action"],
     characters:[
-      /* add Ovenbreak characters here — element field not needed */
+      { name:"Adventurer", rarity:"Epic", element:"action",
+        arc:"2018", affiliation:"Hero",
+        role:["Speed","Jellies","FixedSpeed"] },
+      { name:"Agar Agar", rarity:"Epic", element:"non-action",
+        arc:"2026", affiliation:"Villain",
+        role:["Flight","Speed","Score","Jellies"] },
+      { name:"Agent Jjajang", rarity:"Epic", element:"action",
+        arc:"2024", affiliation:"Hero",
+        role:["Speed","Score","Blast","SpecialControl"] },
+      { name:"Agent Olive", rarity:"Epic", element:"action",
+        arc:"2024", affiliation:"Hero",
+        role:["Speed","Score","Jellies","SpecialControl"] },
+      { name:"Almond", rarity:"Epic", element:"action",
+        arc:"2021", affiliation:"Hero",
+        role:["Speed","Score","Jump","SpecialControl","Destruction"] },
+      { name:"Aloe", rarity:"Epic", element:"action",
+        arc:"2021", affiliation:"Neutral",
+        role:["Score","Jellies","SpecialControl","SuperMagnetism"] },
+      { name:"Amber Sugar", rarity:"Epic", element:"action",
+        arc:"2021", affiliation:"Hero",
+        role:["Flight","Speed","Jellies","SpecialControl"] },
+      { name:"Angel Chiffon", rarity:"Epic", element:"non-action",
+        arc:"2026", affiliation:"Hero",
+        role:["Flight","Speed","Jellies"] },
+      { name:"Apple", rarity:"Epic", element:"action",
+        arc:"2020", affiliation:"Hero",
+        role:["Flight","Speed","Score","Jellies"] },
+      { name:"Astronaut", rarity:"Epic", element:"non-action",
+        arc:"2023", affiliation:"Hero",
+        role:["Dash","Flight","Speed","Jellies","FixedSpeed","StarJellies"] },
+      { name:"Astronuts", rarity:"Epic", element:"action",
+        arc:"2025", affiliation:"Hero",
+        role:["Flight","Speed","Score","Blast","SpecialControl"] },
+      { name:"Avocado", rarity:"Epic", element:"action",
+        arc:"2018", affiliation:"Hero",
+        role:["GiantMode","Speed","Slide","Score","Jellies","Blast","SpecialControl","Destruction"] },
+      { name:"Baguette", rarity:"Epic", element:"action",
+        arc:"2023", affiliation:"Neutral",
+        role:["Speed","Score","SpecialControl"] },
+      { name:"Banana", rarity:"Epic", element:"action",
+        arc:"2021", affiliation:"Hero",
+        role:["Speed","Score","Coins","FixedSpeed"] },
+      { name:"Beet", rarity:"Epic", element:"action",
+        arc:"2019", affiliation:"Hero",
+        role:["Speed","Score","Jellies","SpecialControl"] },
+      { name:"Bellflower", rarity:"Epic", element:"action",
+        arc:"2021", affiliation:"Hero",
+        role:["Score","EnergySpeed","SpecialControl","Recovery"] },
+      { name:"Bell Pepper", rarity:"Epic", element:"action",
+        arc:"2021", affiliation:"Hero",
+        role:["Dash","Speed","Score","Jellies","SpecialControl","SuperMagnetism"] },
+      { name:"Birthday Cake", rarity:"Epic", element:"action",
+        arc:"2019", affiliation:"Hero",
+        role:["Speed","Jellies","SpecialControl","StarJellies"] },
+      { name:"Blackberry", rarity:"Epic", element:"non-action",
+        arc:"2018", affiliation:"Neutral",
+        role:["GiantMode","BearJellies","Items","Jellies","Coins","Potions"] },
+      { name:"Black Garlic", rarity:"Epic", element:"action",
+        arc:"2022", affiliation:"Hero",
+        role:["Speed","Score","Jellies","SpecialControl"] },
+      { name:"Blueberry Pie", rarity:"Epic", element:"non-action",
+        arc:"2019", affiliation:"Neutral",
+        role:["Revival","Flight","Speed","Score","Jellies"] },
+      { name:"Blue Lily", rarity:"Epic", element:"action",
+        arc:"2022", affiliation:"Hero",
+        role:["BearJellies","Score","Jellies","SpecialControl","FixedSpeed","Potions","JellyParty"] },
+      { name:"Blue Slushy", rarity:"Epic", element:"non-action",
+        arc:"2023", affiliation:"Hero",
+        role:["Flight","Speed","Jellies"] },
+      { name:"Blue Whale", rarity:"Epic", element:"non-action",
+        arc:"2025", affiliation:"Hero",
+        role:["Flight","Speed","Jellies"] },
+      { name:"Butterbear", rarity:"Epic", element:"non-action",
+        arc:"2022", affiliation:"Hero",
+        role:["Score","Jellies"] },
+      { name:"Butter Pretzel", rarity:"Epic", element:"action",
+        arc:"2021", affiliation:"Hero",
+        role:["Speed","Score","Jellies","SpecialControl"] },
+      { name:"Butter Squid", rarity:"Epic", element:"action",
+        arc:"2024", affiliation:"Neutral",
+        role:["BlastMode","Slide","Magnetism","Score","Jellies"] },
+      { name:"Candlelight", rarity:"Epic", element:"action",
+        arc:"2022", affiliation:"Neutral",
+        role:["BlastMode","Score","Jump","Jellies","SpecialControl"] },
+      { name:"Candy Corn", rarity:"Epic", element:"non-action",
+        arc:"2024", affiliation:"Hero",
+        role:"Jellies" },
+      { name:"Cannoli", rarity:"Epic", element:"action",
+        arc:"2023", affiliation:"Hero",
+        role:["Score","Jellies"] },
+      { name:"Cappuccino", rarity:"Epic", element:"action",
+        arc:"2023", affiliation:"Hero",
+        role:["Speed","Score","Jellies","SpecialControl"] },
+      { name:"Captain Ice", rarity:"Epic", element:"action",
+        arc:"2020", affiliation:"Hero",
+        role:["Speed","Score","Jellies","SpecialControl","SuperMagnetism"] },
+      { name:"Caramel Choux", rarity:"Epic", element:"action",
+        arc:"2025", affiliation:"Hero",
+        role:["Speed","Jellies","FixedSpeed","Potions"] },
+      { name:"Carrot", rarity:"Epic", element:"non-action",
+        arc:"2019", affiliation:"Hero",
+        role:["BlastMode","Score","Jellies","Coins","Potions"] },
+      { name:"Carol", rarity:"Epic", element:"non-action",
+        arc:"2017", affiliation:"Hero",
+        role:["Jellies","Destruction","Recovery","JellyParty","NoteJelly"] },
+      { name:"Cauliflower", rarity:"Epic", element:"action",
+        arc:"2022", affiliation:"Hero",
+        role:["Speed","Score","Jellies","FixedSpeed"] },
+      { name:"Centipede", rarity:"Epic", element:"action",
+        arc:"2023", affiliation:"Neutral",
+        role:["Speed","Jellies","SpecialControl"] },
+      { name:"Cherry Ball", rarity:"Epic", element:"action",
+        arc:"2022", affiliation:"Hero",
+        role:["BlastMode","Score","Jellies","FixedSpeed"] },
+      { name:"Cherry Blossom", rarity:"Epic", element:"non-action",
+        arc:"2018", affiliation:"Hero",
+        role:["Flight","Speed","Jellies","FlowerJelly"] },
+      { name:"Cherry Cola", rarity:"Epic", element:"action",
+        arc:"2024", affiliation:"Hero",
+        role:["Dash","Speed","Score","Jellies","Blast","SpecialControl","Destruction","FixedSpeed"] },
+      { name:"Chess Choco", rarity:"Epic", element:"action",
+        arc:"2020", affiliation:"Villain",
+        role:["BlastMode","LastBlast","Score","Jump","Jellies","Recovery"] },
+      { name:"Chestnut", rarity:"Epic", element:"action",
+        arc:"2019", affiliation:"Hero",
+        role:["Speed","Score","Jellies","SpecialControl","FixedSpeed"] },
+      { name:"Chili Pepper", rarity:"Epic", element:"action",
+        arc:"2018", affiliation:"Neutral",
+        role:["Jellies","EnergySpeed","Coins","Destruction"] },
+      { name:"Choco Ball", rarity:"Epic", element:"action",
+        arc:"2022", affiliation:"Hero",
+        role:["Dash","Speed","Score","SpecialControl","FixedSpeed"] },
+      { name:"Choco Bar", rarity:"Epic", element:"action",
+        arc:"2024", affiliation:"Hero",
+        role:["Dash","Speed","Slide","Score","Jump","Jellies","SpecialControl","Destruction"] },
+      { name:"Chocolate Bark", rarity:"Epic", element:"action",
+        arc:"2025", affiliation:"Hero",
+        role:["Dash","Speed","Score","SpecialControl","Destruction"] },
+      { name:"Chocolate Bonbon", rarity:"Epic", element:"action",
+        arc:"2021", affiliation:"Hero",
+        role:["Speed","Slide","Score","SpecialControl"] },
+      { name:"Churro", rarity:"Epic", element:"non-action",
+        arc:"2021", affiliation:"Hero",
+        role:["Flight","Speed","Score","Jellies"] },
+      { name:"Cinnamon", rarity:"Epic", element:"non-action",
+        arc:"2018", affiliation:"Hero",
+        role:["Revival","Jellies","JellyParty"] },
+      { name:"Cocoa", rarity:"Epic", element:"non-action",
+        arc:"2016", affiliation:"Hero",
+        role:["Flight","Speed","Jellies","Potions","JellyParty"] },
+      { name:"Coffee Candy", rarity:"Epic", element:"action",
+        arc:"2023", affiliation:"Hero",
+        role:["Speed","Score","Jellies"] },
+      { name:"Cookiemals", rarity:"Epic", element:"action",
+        arc:"2021", affiliation:"Hero",
+        role:["Dash","Flight","Speed","Score","Jellies","Blast","SpecialControl"] },
+      { name:"Cotton Candy", rarity:"Epic", element:"action",
+        arc:"2019", affiliation:"Hero",
+        role:["Flight","Speed","Jellies"] },
+      { name:"Cream Puff", rarity:"Epic", element:"non-action",
+        arc:"2016", affiliation:"Hero",
+        role:["Jellies","BlastMode","Potions"] },
+      { name:"Cream Ferret", rarity:"Epic", element:"action",
+        arc:"2025", affiliation:"Hero",
+        role:["Dash","Shield","Speed","Magnetism","Jump","Jellies","SpecialControl"] },
+      { name:"Cream Soda", rarity:"Epic", element:"action",
+        arc:"2024", affiliation:"Hero",
+        role:["Dash","Speed","Jellies","SpecialControl"] },
+      { name:"Cream Unicorn", rarity:"Epic", element:"non-action",
+        arc:"2020", affiliation:"Hero",
+        role:["Flight","Speed","Jellies","SuperMagnetism"] },
+      { name:"Croissant", rarity:"Epic", element:"non-action",
+        arc:"2020", affiliation:"Hero",
+        role:["Flight","Speed","Score","Jellies"] },
+      { name:"Crowberry", rarity:"Epic", element:"action",
+        arc:"2022", affiliation:"Hero",
+        role:["Flight","Speed","Score","Jellies","FixedSpeed"] },
+      { name:"Currant Cream", rarity:"Epic", element:"action",
+        arc:"2023", affiliation:"Hero",
+        role:["Speed","Score","Jellies","SpecialControl"] },
+      { name:"Cyborg", rarity:"Epic", element:"non-action",
+        arc:"2019", affiliation:"Hero",
+        role:["Flight","Speed","Score","Jellies","FixedSpeed","SuperMagnetism"] },
     ],
   },
 
@@ -860,33 +1084,16 @@ function anyShared(a,b) {
                        full value-set. For a multi-arc cookie you only
                        get green once your guess shares ALL of its arcs.
    • close   (yellow): the sets aren't identical but OVERLAP — they share
-                       at least one value. For Role/Element, sharing a
-                       similarity GROUP also counts as overlap.
-   • wrong   (red)   : no shared value and no shared group. */
+                       at least one value.
+   • wrong   (red)   : nothing shared.
+   NOTE: similarity groups (roleSimilarGroups / elementGroups) are no
+   longer used by the scoring code. They remain in GAME_DATA so they
+   can be re-enabled later without restructuring, but currently only
+   exact value overlap matters. */
 function scoreCategory(key, gVal, aVal) {
   const g=toArr(gVal), a=toArr(aVal);
-
-  // exact full-set match → green
   if (g.length && a.length && sameSet(g,a)) return "correct";
-
-  // any shared raw value → yellow
   if (anyShared(g,a)) return "close";
-
-  // Role: any shared similarity group across the two value-sets → yellow
-  if (key==="role") {
-    const gGroups=new Set(g.map(getRoleGroup).filter(Boolean));
-    for (const av of a) {
-      const ag=getRoleGroup(av);
-      if (ag && gGroups.has(ag)) return "close";
-    }
-  }
-  // Element: any shared similarity group across the two value-sets → yellow
-  if (key==="element") {
-    const gGroups=new Set(g.map(getElementGroup).filter(Boolean));
-    for (const av of a) {
-      if (gGroups.has(getElementGroup(av))) return "close";
-    }
-  }
   return "wrong";
 }
 
@@ -940,7 +1147,7 @@ function initGame() {
 
   // Set the grid template columns to match the category count.
   const colCount=activeCats().length;
-  const tmpl=`130px repeat(${colCount},1fr)`;
+  const tmpl=`var(--char-col) repeat(${colCount},1fr)`;
   document.getElementById("cat-header").style.gridTemplateColumns=tmpl;
 
   // category header labels
@@ -996,12 +1203,25 @@ function persistGame() {
 function scoreGuess(guessChar) {
   return activeCats().map(cat=>{
     const vals=toArr(guessChar[cat.key]);
-    return {
+    const cell={
       key:cat.key, label:cat.label,
       // join multi-values with " · " for display; "–" if empty
       value:vals.length?vals.join(" · "):"–",
       status:scoreCategory(cat.key,guessChar[cat.key],todayChar[cat.key]),
     };
+    // ── Ovenbreak role: per-tag matching for the pill renderer ──
+    // For every tag the player guessed, mark whether it's in the
+    // answer's tag list. The cell's overall background still uses the
+    // set-level status (correct/close/wrong); the pills add per-tag
+    // detail on top so a 1-out-of-7 match is readable.
+    if (activeGameId==="ovenbreak" && cat.key==="role") {
+      const answerTags=new Set(toArr(todayChar[cat.key]).map(s=>s.toLowerCase()));
+      cell.tags=vals.map(tag=>({
+        text:tag,
+        match:answerTags.has(tag.toLowerCase()),
+      }));
+    }
+    return cell;
   });
 }
 
@@ -1010,7 +1230,7 @@ function renderGame() {
   const container=document.getElementById("guesses");
   container.innerHTML="";
   const colCount=activeCats().length;
-  const tmpl=`130px repeat(${colCount},1fr)`;
+  const tmpl=`var(--char-col) repeat(${colCount},1fr)`;
   guesses.forEach(g=>container.appendChild(buildRow(g,tmpl)));
   document.getElementById("attempt-num").textContent=Math.min(guesses.length+1,maxAttempts());
   document.getElementById("result-banner").classList.remove("show");
@@ -1029,7 +1249,19 @@ function buildRow(g,tmpl) {
     const cell=document.createElement("div");
     cell.className=`cat-cell ${cat.status}`;
     cell.style.animationDelay=`${i*0.08}s`;
-    cell.innerHTML=`<div class="cell-label">${cat.label}</div><div class="cell-value">${cat.value}</div>`;
+    // ── Ovenbreak role cell: render pills (per-tag green/red outline) ──
+    // cat.tags is only set by scoreGuess for Ovenbreak's role cell;
+    // every other cell uses the normal text rendering.
+    if (cat.tags && cat.tags.length) {
+      const pills=cat.tags.map(t=>
+        `<span class="role-pill ${t.match?"hit":"miss"}">${t.text}</span>`
+      ).join("");
+      cell.innerHTML=`<div class="cell-label">${cat.label}</div>`+
+        `<div class="cell-value role-pills">${pills}</div>`;
+      cell.classList.add("role-pill-cell");
+    } else {
+      cell.innerHTML=`<div class="cell-label">${cat.label}</div><div class="cell-value">${cat.value}</div>`;
+    }
     row.appendChild(cell);
   });
   return row;
